@@ -106,7 +106,7 @@ def rpc_to_textchange(change: dict) -> TextChange:
         LineCharacter(**change["range"]["start"]),
         LineCharacter(**change["range"]["end"]),
         change["newText"],
-        change["rangeLength"],
+        change.get("rangeLength", 0),
     )
 
 
