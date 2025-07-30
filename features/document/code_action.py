@@ -1,6 +1,6 @@
 from collections import namedtuple
 from functools import wraps
-from typing import List
+from typing import List, Any
 import sublime
 import sublime_plugin
 
@@ -24,11 +24,11 @@ class _CodeActionCommand(sublime_plugin.TextCommand):
     client = None
 
     @client_must_ready
-    def run(self, edit: sublime.Edit):
+    def run(self, edit: sublime.Edit, kinds: List[str] = None):
         if not is_valid_document(self.view):
             return
 
-        self.client.textdocument_code_action(self.view, self.view.sel()[0])
+        self.client.textdocument_code_action(self.view, self.view.sel()[0], kinds)
 
     def is_visible(self):
         return is_valid_document(self.view)
@@ -54,7 +54,7 @@ class DocumentCodeActionMixins:
     code_action_target = None
 
     @must_initialized
-    def textdocument_code_action(self, view, region, only_context=None):
+    def textdocument_code_action(self, view, region, action_kinds=None):
         if document := self.session.get_document(view.file_name()):
             self.code_action_target = document
             start = LineCharacter(*view.rowcol(region.begin()))
@@ -65,8 +65,8 @@ class DocumentCodeActionMixins:
                 "diagnostics": diagnostis,
                 "triggerKind": 2,
             }
-            only_context = only_context if only_context else []
-            context["only"] = list(set(only_context + ["quickfix", "refactor"]))
+            if action_kinds:
+                context["only"] = list(action_kinds)
 
             self.message_pool.send_request(
                 "textDocument/codeAction",
@@ -102,4 +102,21 @@ class DocumentCodeActionMixins:
         )
 
     def _handle_selected_action(self, session: Session, action: dict) -> None:
+        raise NotImplementedError
+
+
+class CodeActionResolveMixins:
+
+    @must_initialized
+    def code_action_resolve(self, params: Any):
+        self.message_pool.send_request("codeAction/resolve", params)
+
+    def handle_code_action_resolve(self, session: Session, params: Response):
+        if err := params.error:
+            print(err["message"])
+
+        elif result := params.result:
+            self._handle_action(session, result)
+
+    def _handle_action(self, session: Session, action: dict) -> None:
         raise NotImplementedError
