@@ -1,7 +1,7 @@
 import threading
 
 from dataclasses import dataclass
-from functools import wraps
+from functools import wraps, lru_cache
 from pathlib import Path
 from typing import Optional, Dict, List, Callable, Any, Union
 import sublime
@@ -27,6 +27,14 @@ class ServerArguments:
     cwd: Path
 
 
+@lru_cache
+def normalize_method(method: MethodName) -> str:
+    """normalize_method
+    e.g.: textDocument/completion -> textcocument_completion
+    """
+    return method.replace("/", "_").lower()
+
+
 class BaseClient:
     """"""
 
@@ -43,18 +51,37 @@ class BaseClient:
         # session data
         self.session = Session()
 
+    def _set_default_handler(self):
+        # Register all callable attribute starts with 'handle_' as default
+        # method handler.
+        # Method name must following rule:
+        #   * replace '/' with '_'
+        #   * method start with 'handle_'
+        #
+        # e.g: textDocument/completion -> textcocument_completion
+
+        for name in dir(self):
+            attribute = getattr(self, name)
+            if not callable(attribute):
+                continue
+
+            prefix = "handle_"
+            if name.startswith(prefix):
+                method = name[len(prefix) :]
+                self.handler_map[method.lower()] = attribute
+
     def handle(self, method: MethodName, params: HandleParams) -> Optional[Any]:
         """"""
         try:
-            func = self.handler_map[method]
-        except KeyError as err:
-            raise MethodNotFound(err)
+            func = self.handler_map[normalize_method(method)]
+        except KeyError:
+            raise MethodNotFound(MethodName)
 
         return func(self.session, params)
 
     def register_handler(self, method: MethodName, function: HandlerFunction) -> None:
         """"""
-        self.handler_map[method] = function
+        self.handler_map[normalize_method(method)] = function
 
     def start_server(self, env: Optional[dict] = None) -> None:
         """"""
