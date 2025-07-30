@@ -115,7 +115,11 @@ class FileUpdater:
         self.path = Path(file_name)
 
     def apply(self, changes: List[TextChange]) -> None:
-        old_text = self.path.read_text()
+        try:
+            old_text = self.path.read_text()
+        except FileNotFoundError:
+            old_text = ""
+
         new_text = self._update_text(old_text, changes)
         self.path.write_text(new_text)
 
