@@ -2,7 +2,7 @@ from functools import wraps
 import logging
 
 from ....constant import LOGGING_CHANNEL
-from ...lsp_client import Response
+from ...message import Response
 from ...session import Session
 
 LOGGER = logging.getLogger(LOGGING_CHANNEL)

@@ -1,20 +1,21 @@
-import threading
+"""client object"""
 
+import threading
 from dataclasses import dataclass
 from functools import wraps, lru_cache
 from pathlib import Path
 from typing import Optional, Dict, List, Callable, Any, Union
 import sublime
 
+from .child_process import ChildProcess
 from .errors import MethodNotFound
-from .lsp_client import (
+from .message import (
     MessagePool,
-    ChildProcess,
-    Transport,
     MethodName,
     Response,
 )
 from .session import Session
+from .transport import Transport
 
 
 HandleParams = Union[Response, dict]

@@ -3,7 +3,7 @@ from pathlib import Path
 import sublime
 import sublime_plugin
 
-from ..lsp_client import Response
+from ..message import Response
 from ..session import Session, InitializeStatus
 from ..uri import path_to_uri
 

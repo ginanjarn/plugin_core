@@ -1,20 +1,16 @@
-"""client server api"""
+"""message handler"""
 
-import json
 import logging
-import os
-import re
 import threading
-import subprocess
-import shlex
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, asdict
-from functools import wraps
-from io import BytesIO
-from pathlib import Path
-from typing import Optional, Union, List, Dict, Callable, Any
+from json import (
+    loads as json_loads,
+    dumps as json_dumps,
+)
+from typing import Optional, Union, Dict, Callable, Any
 
 from .errors import transform_error
+from .transport import Transport
 from ..constant import LOGGING_CHANNEL
 
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
@@ -50,9 +46,14 @@ class Response(Message):
 
 
 def loads(json_str: Union[str, bytes]) -> Message:
-    """loads json-rpc message"""
+    """loads json-rpc message
 
-    dct = json.loads(json_str)
+    Raises:
+      * json.JsonDecodeError if fail loads json
+      * ValueError if invalid jsonrpc version
+    """
+
+    dct = json_loads(json_str)
     try:
         if (jsonrpc_version := dct.pop("jsonrpc")) and jsonrpc_version != "2.0":
             raise ValueError("invalid jsonrpc version")
@@ -79,241 +80,10 @@ def dumps(message: Message, as_bytes: bool = False) -> Union[str, bytes]:
         else:
             del dct["result"]
 
-    json_str = json.dumps(dct)
+    json_str = json_dumps(dct)
     if as_bytes:
         return json_str.encode()
     return json_str
-
-
-class HeaderError(ValueError):
-    """header error"""
-
-
-def wrap_rpc(content: bytes) -> bytes:
-    """wrap content as rpc body"""
-    header = b"Content-Length: %d\r\n" % len(content)
-    separator = b"\r\n"
-    return b"%s%s%s" % (header, separator, content)
-
-
-def get_content_length(header: bytes) -> int:
-    for line in header.splitlines():
-        if match := re.match(rb"Content-Length: (\d+)", line):
-            return int(match.group(1))
-
-    raise HeaderError("unable get 'Content-Length'")
-
-
-class Transport(ABC):
-    """Transport abstraction"""
-
-    @abstractmethod
-    def connect(self) -> None:
-        """open connection to server"""
-
-    @abstractmethod
-    def close(self) -> None:
-        """close connection to server"""
-
-    @abstractmethod
-    def write(self, data: bytes) -> None:
-        """Write data to server"""
-
-    @abstractmethod
-    def read(self) -> bytes:
-        """Read data from server"""
-
-
-if os.name == "nt":
-    STARTUPINFO = subprocess.STARTUPINFO()
-    # Hide created process window
-    STARTUPINFO.dwFlags |= subprocess.SW_HIDE | subprocess.STARTF_USESHOWWINDOW
-else:
-    STARTUPINFO = None
-
-
-def recover_exception(
-    default_factory: Callable[[Any], Any],
-    *,
-    exceptions: Optional[Union[Exception, tuple]] = None,
-):
-    """return default value if exception raised
-
-    Arguments:
-        default_factory: factory of default value
-        excepttions: captured exceptions
-
-    Returns:
-        default_factory() result
-    """
-
-    # default
-    exceptions = exceptions or Exception
-
-    def wrapper(func):
-        @wraps(func)
-        def inner(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except exceptions:
-                return default_factory()
-
-        return inner
-
-    return wrapper
-
-
-class ChildProcess:
-    """Child Process"""
-
-    def __init__(self, command: List[str], cwd: Optional[Path] = None):
-        if not isinstance(command, list):
-            raise ValueError("command value must list of str")
-
-        self.command = command
-        self.cwd = cwd
-
-        self.process: subprocess.Popen = None
-        self._run_event = threading.Event()
-
-        # Prevent run process until termination done
-        self._terminate_event = threading.Event()
-        self._terminate_event.set()
-
-    def is_running(self) -> bool:
-        """If process is running"""
-        if not self.process:
-            return False
-        return self.process.poll() is None
-
-    def wait_process_running(self) -> None:
-        """Wait process running"""
-        self._run_event.wait()
-
-    def run(self, env: Optional[dict] = None) -> None:
-        """Run process"""
-
-        # Wait if in termination process
-        self._terminate_event.wait()
-
-        # Prevent process reassignment
-        if self.process and self.process.poll() is None:
-            return
-
-        print("execute '%s'" % shlex.join(self.command))
-
-        self.process = subprocess.Popen(
-            self.command,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=env or None,
-            cwd=self.cwd or None,
-            shell=True,
-            bufsize=0,
-            startupinfo=STARTUPINFO,
-        )
-
-        # Ready to call 'Popen()' object
-        self._run_event.set()
-
-        thread = threading.Thread(target=self._listen_stderr_task)
-        thread.start()
-
-    @property
-    @recover_exception(BytesIO)
-    def stdin(self):
-        return self.process.stdin
-
-    @property
-    @recover_exception(BytesIO)
-    def stdout(self):
-        return self.process.stdout
-
-    @property
-    @recover_exception(BytesIO)
-    def stderr(self):
-        return self.process.stderr
-
-    def _listen_stderr_task(self):
-        prefix = f"[{self.command[0]}]"
-        while bline := self.stderr.readline():
-            print(prefix, bline.rstrip().decode())
-
-        # Stderr return empty character, process is terminated
-        self._terminate_event.set()
-
-    def terminate(self) -> None:
-        """Terminate process"""
-
-        self._terminate_event.clear()
-        self._run_event.clear()
-
-        if not self.process:
-            return
-
-        self.process.kill()
-        return_code = self.process.wait()
-        print("process terminated with exit code", return_code)
-        # Set to None to release 'Popen()' object from memory
-        self.process = None
-
-
-class StandardIO(Transport):
-    """StandardIO Transport implementation"""
-
-    def __init__(self, server: ChildProcess) -> None:
-        self.server = server
-
-    def connect(self) -> None:
-        # connect with stdio
-        pass
-
-    def close(self) -> None:
-        self.server.terminate()
-
-    def write(self, data: bytes):
-        self.server.wait_process_running()
-
-        prepared_data = wrap_rpc(data)
-        self.server.stdin.write(prepared_data)
-        self.server.stdin.flush()
-
-    def read(self):
-        self.server.wait_process_running()
-
-        # get header
-        header_buffer = BytesIO()
-        header_separator = b"\r\n"
-        while line := self.server.stdout.readline():
-            # header and content separated by newline with \r\n
-            if line == header_separator:
-                break
-            header_buffer.write(line)
-
-        header = header_buffer.getvalue()
-
-        # no header received
-        if not header:
-            raise EOFError("stdout closed")
-
-        try:
-            content_length = get_content_length(header)
-        except HeaderError as err:
-            LOGGER.exception("header: %r", header_buffer.getvalue())
-            raise err
-
-        content_buffer = BytesIO()
-        # Read until defined content_length received.
-        missing = content_length
-        while missing:
-            if chunk := self.server.stdout.read(missing):
-                n = content_buffer.write(chunk)
-                missing -= n
-            else:
-                raise EOFError("stdout closed")
-
-        return content_buffer.getvalue()
 
 
 class RequestCanceled(Exception):
@@ -413,19 +183,11 @@ class MessagePool:
         self.transport.write(content)
 
     def _listen_task(self) -> None:
-        def listen_message() -> Message:
-            content = self.transport.read()
-            try:
-                message = loads(content)
-            except json.JSONDecodeError as err:
-                LOGGER.exception("content: %r", content)
-                raise err
-
-            return message
 
         while True:
             try:
-                message = listen_message()
+                content = self.transport.read()
+                message = loads(content)
 
             except EOFError:
                 # stdout closed

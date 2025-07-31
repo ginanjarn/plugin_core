@@ -7,7 +7,7 @@ import sublime_plugin
 
 from ...diagnostics import DiagnosticItem
 from ...document import is_valid_document
-from ...lsp_client import Response
+from ...message import Response
 from ...session import Session
 from ...uri import path_to_uri
 
