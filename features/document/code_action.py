@@ -28,7 +28,7 @@ class _CodeActionCommand(sublime_plugin.TextCommand):
         if not is_valid_document(self.view):
             return
 
-        self.client.textdocument_code_action(self.view, self.view.sel()[0], kinds)
+        self.client.textdocument_codeaction(self.view, self.view.sel()[0], kinds)
 
     def is_visible(self):
         return is_valid_document(self.view)
@@ -54,7 +54,7 @@ class DocumentCodeActionMixins:
     code_action_target = None
 
     @must_initialized
-    def textdocument_code_action(self, view, region, action_kinds=None):
+    def textdocument_codeaction(self, view, region, action_kinds=None):
         if document := self.session.get_document(view.file_name()):
             self.code_action_target = document
             start = LineCharacter(*view.rowcol(region.begin()))
@@ -80,7 +80,7 @@ class DocumentCodeActionMixins:
                 },
             )
 
-    def handle_textdocument_code_action(self, session: Session, params: Response):
+    def handle_textdocument_codeaction(self, session: Session, params: Response):
         if err := params.error:
             print(err["message"])
 
@@ -111,7 +111,7 @@ class CodeActionResolveMixins:
     def code_action_resolve(self, params: Any):
         self.message_pool.send_request("codeAction/resolve", params)
 
-    def handle_code_action_resolve(self, session: Session, params: Response):
+    def handle_codeaction_resolve(self, session: Session, params: Response):
         if err := params.error:
             print(err["message"])
 
