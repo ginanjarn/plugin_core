@@ -21,6 +21,7 @@ class DocumentManager:
     """"""
 
     def __init__(self) -> None:
+        super().__init__()
 
         self.working_documents: Dict[PathStr, Document] = {}
         self._working_documents_lock = threading.Lock()
@@ -88,6 +89,7 @@ class InitializeManager:
     """"""
 
     def __init__(self) -> None:
+        super().__init__()
         self._initialize_status = InitializeStatus.NotInitialized
 
     def is_initializing(self) -> bool:
