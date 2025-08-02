@@ -67,7 +67,7 @@ class ChildProcess:
 
     def is_running(self) -> bool:
         """If process is running"""
-        return self.process and self.process.poll() is None
+        return bool(self.process) and self.process.poll() is None
 
     def wait_process_running(self) -> None:
         """Wait process running"""
