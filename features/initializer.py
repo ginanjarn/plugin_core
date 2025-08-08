@@ -39,6 +39,11 @@ class InitializerMixins:
                 "rootUri": path_to_uri(workspace_path),
                 "capabilities": {
                     "textDocument": {
+                        "completion": {
+                            "completionItem": {
+                                "snippetSupport": True,
+                            },
+                        },
                         "hover": {
                             "contentFormat": ["markdown", "plaintext"],
                         }
