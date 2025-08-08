@@ -21,6 +21,8 @@ class DiagnosticItem:
     region: sublime.Region
     message: str
 
+    __slots__ = ("severity", "region", "message")
+
     @classmethod
     def from_rpc(cls, view: sublime.View, diagnostic: dict, /):
         """"""

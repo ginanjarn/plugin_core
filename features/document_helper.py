@@ -12,7 +12,7 @@ class _BufferedTextChange:
     old_text: str
     new_text: str
 
-    __slots__ = ["region", "old_text", "new_text"]
+    __slots__ = ("region", "old_text", "new_text")
 
     def offset_move(self) -> int:
         return len(self.new_text) - len(self.old_text)
