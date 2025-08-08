@@ -86,20 +86,6 @@ class WorkspaceEdit:
         delete_document(file_name)
 
 
-def textchange_to_rpc(text_change: TextChange) -> dict:
-    """"""
-    start = text_change.start
-    end = text_change.end
-    return {
-        "range": {
-            "end": {"character": end.column, "line": end.row},
-            "start": {"character": start.column, "line": start.row},
-        },
-        "rangeLength": text_change.length,
-        "text": text_change.text,
-    }
-
-
 def rpc_to_textchange(change: dict) -> TextChange:
     """"""
     return TextChange(

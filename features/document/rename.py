@@ -1,6 +1,6 @@
 from collections import namedtuple
 from functools import wraps
-from typing import Optional, Callable
+from typing import Optional
 import sublime
 import sublime_plugin
 
@@ -88,11 +88,17 @@ class DocumentRenameMixins:
                 },
             )
 
-    def _handle_preparerename(self, session: Session, location: dict):
+    def handle_textdocument_preparerename(self, session: Session, params: Response):
+        if error := params.error:
+            print(error["message"])
+        elif result := params.result:
+            self._prompt_rename(session, result)
+
+    def _prompt_rename(self, session: Session, symbol_range: dict):
         view = self.rename_target.view
 
-        start = LineCharacter(**location["range"]["start"])
-        end = LineCharacter(**location["range"]["end"])
+        start = LineCharacter(**symbol_range["range"]["start"])
+        end = LineCharacter(**symbol_range["range"]["end"])
         start_point = view.text_point(*start)
         end_point = view.text_point(*end)
 
@@ -107,13 +113,13 @@ class DocumentRenameMixins:
                     {"row": row, "column": col, "new_name": new_name},
                 )
 
-        input_text("rename", old_name, request_rename)
-
-    def handle_textdocument_preparerename(self, session: Session, params: Response):
-        if error := params.error:
-            print(error["message"])
-        elif result := params.result:
-            self._handle_preparerename(session, result)
+        view.window().show_input_panel(
+            caption="Rename",
+            initial_text=old_name,
+            on_done=request_rename,
+            on_change=None,
+            on_cancel=None,
+        )
 
     @must_initialized
     def textdocument_rename(self, view, row, col, new_name):
@@ -137,16 +143,3 @@ class DocumentRenameMixins:
             print(error["message"])
         elif result := params.result:
             WorkspaceEdit(session).apply_changes(result)
-
-
-def input_text(
-    title: str, default_text: str, on_done_callback: Callable[[str], None]
-) -> None:
-    """"""
-    sublime.active_window().show_input_panel(
-        caption=title,
-        initial_text=default_text,
-        on_done=on_done_callback,
-        on_change=None,
-        on_cancel=None,
-    )

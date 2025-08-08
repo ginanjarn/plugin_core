@@ -1,4 +1,3 @@
-from collections import namedtuple
 from functools import wraps
 from typing import List
 import sublime
@@ -88,17 +87,14 @@ class DocumentSynchronizeTextChangeListener(
         view = self.buffer.primary_view()
         if not is_valid_document(view):
             return
-        self.didchange(view, [self.to_text_change(c) for c in changes])
+        self.didchange(view, [self._to_text_change(c) for c in changes])
 
     @staticmethod
-    def to_text_change(change: sublime.TextChange) -> TextChange:
+    def _to_text_change(change: sublime.TextChange) -> TextChange:
         """"""
         start = (change.a.row, change.a.col)
         end = (change.b.row, change.b.col)
         return TextChange(start, end, change.str, change.len_utf8)
-
-
-LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
 
 def must_initialized(func):
@@ -199,8 +195,8 @@ def textchange_to_rpc(text_change: TextChange) -> dict:
     end = text_change.end
     return {
         "range": {
-            "end": {"character": end.column, "line": end.row},
-            "start": {"character": start.column, "line": start.row},
+            "start": {"line": start[0], "character": start[1]},
+            "end": {"line": end[0], "character": end[1]},
         },
         "rangeLength": text_change.length,
         "text": text_change.text,

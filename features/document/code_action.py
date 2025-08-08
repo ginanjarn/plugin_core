@@ -1,4 +1,3 @@
-from collections import namedtuple
 from functools import wraps
 from typing import List, Any
 import sublime
@@ -34,9 +33,6 @@ class _CodeActionCommand(sublime_plugin.TextCommand):
         return is_valid_document(self.view)
 
 
-LineCharacter = namedtuple("LineCharacter", ["line", "character"])
-
-
 def must_initialized(func):
     """exec if initialized"""
 
@@ -57,8 +53,8 @@ class DocumentCodeActionMixins:
     def textdocument_codeaction(self, view, region, action_kinds=None):
         if document := self.session.get_document(view.file_name()):
             self.code_action_target = document
-            start = LineCharacter(*view.rowcol(region.begin()))
-            end = LineCharacter(*view.rowcol(region.end()))
+            start = view.rowcol(region.begin())
+            end = view.rowcol(region.end())
             diagnostis = self.session.diagnostic_manager.get_raw(view)
 
             context = {
@@ -73,8 +69,8 @@ class DocumentCodeActionMixins:
                 {
                     "textDocument": {"uri": path_to_uri(document.file_name)},
                     "range": {
-                        "start": {"line": start.line, "character": start.character},
-                        "end": {"line": end.line, "character": end.character},
+                        "start": {"line": start[0], "character": start[1]},
+                        "end": {"line": end[0], "character": end[1]},
                     },
                     "context": context,
                 },
