@@ -1,6 +1,6 @@
 from collections import namedtuple
 from functools import wraps
-from typing import Optional
+from typing import Optional, Iterator
 import sublime
 import sublime_plugin
 
@@ -142,4 +142,9 @@ class DocumentRenameMixins:
         if error := params.error:
             print(error["message"])
         elif result := params.result:
-            WorkspaceEdit(session).apply_changes(result)
+            changes = self._get_changes(result)
+            WorkspaceEdit(session).apply_changes(changes)
+
+    def _get_changes(self, edit: dict) -> Iterator[dict]:
+        for document_changes in edit["documentChanges"]:
+            yield document_changes

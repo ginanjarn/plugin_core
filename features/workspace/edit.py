@@ -1,7 +1,7 @@
 import logging
 from collections import namedtuple
 from pathlib import Path
-from typing import List
+from typing import List, Iterator
 
 import sublime
 
@@ -17,13 +17,18 @@ PathStr = str
 class WorkspaceApplyEditMixins:
     def handle_workspace_applyedit(self, session: Session, params: dict) -> dict:
         try:
-            WorkspaceEdit(session).apply_changes(params["edit"])
+            changes = self._get_changes(params["edit"])
+            WorkspaceEdit(session).apply_changes(changes)
 
         except Exception as err:
             LOGGER.error(err, exc_info=True)
             return {"applied": False}
         else:
             return {"applied": True}
+
+    def _get_changes(self, edit: dict) -> Iterator[dict]:
+        for document_changes in edit["documentChanges"]:
+            yield document_changes
 
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
@@ -34,56 +39,66 @@ class WorkspaceEdit:
     def __init__(self, session: Session):
         self.session = session
 
-    def apply_changes(self, edit_changes: dict) -> None:
-        """"""
+    def apply_changes(self, document_changes_items: List[dict]):
+        for change in document_changes_items:
+            self._apply_changes(change)
 
-        for document_changes in edit_changes["documentChanges"]:
-            # documentChanges: TextEdit|CreateFile|RenameFile|DeleteFile
+    def _apply_changes(self, changes: dict) -> None:
+        # changes: TextEdit|CreateFile|RenameFile|DeleteFile
 
+        if "kind" in changes:
             # File Resource Changes
-            if document_changes.get("kind"):
-                self._apply_resource_changes(document_changes)
-                return
-
-            # TextEdit Changes
-            self._apply_textedit_changes(document_changes)
-
-    def _apply_textedit_changes(self, document_changes: dict):
-        file_name = uri_to_path(document_changes["textDocument"]["uri"])
-        edits = document_changes["edits"]
-        changes = [rpc_to_textchange(c) for c in edits]
-
-        if document := self.session.get_document(file_name):
-            document.apply_changes(changes)
-            document.save()
-
+            self._apply_resource_changes(changes)
         else:
-            update_document(file_name, changes)
+            # TextEdit Changes
+            self._apply_edit_changes(changes)
 
-    def _apply_resource_changes(self, changes: dict):
-        func = {
+    def _apply_resource_changes(self, resource_changes: dict) -> None:
+        resource_change_map = {
             "create": self._create_document,
             "rename": self._rename_document,
             "delete": self._delete_document,
         }
-        kind = changes["kind"]
-        func[kind](changes)
+        kind = resource_changes["kind"]
+        resource_change_map[kind](resource_changes)
+
+    def _apply_edit_changes(self, document_changes: dict):
+        file_name = uri_to_path(document_changes["textDocument"]["uri"])
+        changes = [rpc_to_textchange(c) for c in document_changes["edits"]]
+
+        if document := self.session.get_document(file_name):
+            document.apply_changes(changes)
+            document.save()
+        else:
+            FileUpdater(file_name).apply(changes)
 
     @staticmethod
-    def _create_document(document_changes: dict):
-        file_name = uri_to_path(document_changes["uri"])
-        create_document(file_name)
+    def _create_document(resource_changes: dict):
+        file_name = uri_to_path(resource_changes["textDocument"]["uri"])
+        Path(file_name).touch(exist_ok=True)
 
     @staticmethod
-    def _rename_document(document_changes: dict):
-        old_name = uri_to_path(document_changes["oldUri"])
-        new_name = uri_to_path(document_changes["newUri"])
-        rename_document(old_name, new_name)
+    def _rename_document(resource_changes: dict):
+        old = uri_to_path(resource_changes["oldUri"])
+        new = uri_to_path(resource_changes["newUri"])
+        Path(old).rename(new)
+
+        # retarget buffer to new path
+        for view in [
+            v for v in sublime.active_window().views() if v.file_name() == old
+        ]:
+            view.retarget(new)
 
     @staticmethod
-    def _delete_document(document_changes: dict):
-        file_name = uri_to_path(document_changes["uri"])
-        delete_document(file_name)
+    def _delete_document(resource_changes: dict):
+        file_name = uri_to_path(resource_changes["textDocument"]["uri"])
+        Path(file_name).unlink()
+
+        # close opened view
+        for view in [
+            v for v in sublime.active_window().views() if v.file_name() == file_name
+        ]:
+            view.close()
 
 
 def rpc_to_textchange(change: dict) -> TextChange:
@@ -124,38 +139,3 @@ class FileUpdater:
             temp = f"{temp[:start_offset]}{change.text}{temp[end_offset:]}"
 
         return temp
-
-
-def update_document(file_name: PathStr, changes: List[TextChange]):
-    """update document"""
-    updater = FileUpdater(file_name)
-    updater.apply(changes)
-
-
-def create_document(file_name: PathStr, text: str = ""):
-    """create document"""
-    path = Path(file_name)
-    path.touch()
-    path.write_text(text)
-
-
-def rename_document(old_name: PathStr, new_name: PathStr):
-    """rename document"""
-    path = Path(old_name)
-    path.rename(new_name)
-
-    # Sublime Text didn't update the view target if renamed
-    for window in sublime.windows():
-        for view in [v for v in window.views() if v.file_name() == old_name]:
-            view.retarget(new_name)
-
-
-def delete_document(file_name: PathStr):
-    """delete document"""
-    path = Path(file_name)
-    path.unlink()
-
-    # Sublime Text didn't close deleted file
-    for window in sublime.windows():
-        for view in [v for v in window.views() if v.file_name() == file_name]:
-            view.close()
