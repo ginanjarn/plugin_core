@@ -5,7 +5,6 @@ from html import escape as escape_html
 import sublime
 import sublime_plugin
 
-from ...diagnostics import DiagnosticItem
 from ...document import is_valid_document
 from ...message import Response
 from ...session import Session
@@ -93,10 +92,8 @@ class DocumentHoverMixins:
     def _get_diagnostic_message(self, view: sublime.View, row: int, col: int):
         point = view.text_point(row, col)
 
-        def contain_point(item: "DiagnosticItem"):
-            return item.region.contains(point)
-
-        items = self.session.diagnostic_manager.get(view, contain_point)
+        diagnostics = self.session.diagnostic_manager.get(view)
+        items = [i for i in diagnostics if i.region.contains(point)]
         if not items:
             return ""
 

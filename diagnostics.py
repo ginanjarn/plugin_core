@@ -80,16 +80,10 @@ class DiagnosticManager:
         with self._change_lock:
             return self.raw_itams_map[view.file_name()]
 
-    def get(
-        self,
-        view: sublime.View,
-        filter_fn: Callable[[DiagnosticItem], bool] = None,
-    ) -> List[DiagnosticItem]:
+    def get(self, view: sublime.View) -> List[DiagnosticItem]:
         """return diagnostic item"""
         with self._change_lock:
-            if not filter_fn:
-                return self.items_map[view.file_name()]
-            return [d for d in self.items_map[view.file_name()] if filter_fn(d)]
+            return self.items_map[view.file_name()]
 
     def add(self, view: sublime.View, diagnostics: List[dict]):
         """add diagnostics"""
