@@ -11,15 +11,16 @@ from .child_process import ChildProcess
 from .errors import MethodNotFound
 from .message import (
     MessagePool,
-    MethodName,
+    Method,
     Response,
+    Params,
 )
 from .session import Session
 from .transport import Transport
 
 
-HandleParams = Union[Response, dict]
-HandlerFunction = Callable[[Session, HandleParams], Any]
+HandleParams = Union[Params, Response]
+HandleSessionFunction = Callable[[Session, HandleParams], Any]
 
 
 @dataclass
@@ -29,7 +30,7 @@ class ServerArguments:
 
 
 @lru_cache
-def normalize_method(method: MethodName) -> str:
+def normalize_method(method: Method) -> str:
     """normalize_method
     e.g.: textDocument/completion -> textcocument_completion
     """
@@ -44,7 +45,7 @@ class BaseClient:
         self.message_pool = MessagePool(transport_cls(self.server), self.handle)
 
         # server message handler
-        self.handler_map: Dict[MethodName, HandlerFunction] = dict()
+        self.handler_map: Dict[Method, HandleSessionFunction] = dict()
         self._start_server_lock = threading.Lock()
 
         self._set_default_handler()
@@ -71,16 +72,16 @@ class BaseClient:
                 method = name[len(prefix) :]
                 self.handler_map[method.lower()] = attribute
 
-    def handle(self, method: MethodName, params: HandleParams) -> Optional[Any]:
+    def handle(self, method: Method, params: HandleParams) -> Optional[Any]:
         """"""
         try:
             func = self.handler_map[normalize_method(method)]
         except KeyError:
-            raise MethodNotFound(MethodName)
+            raise MethodNotFound(Method)
 
         return func(self.session, params)
 
-    def register_handler(self, method: MethodName, function: HandlerFunction) -> None:
+    def register_handler(self, method: Method, function: HandleSessionFunction) -> None:
         """"""
         self.handler_map[normalize_method(method)] = function
 

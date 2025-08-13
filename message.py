@@ -16,8 +16,8 @@ from ..constant import LOGGING_CHANNEL
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
 
-class MethodName(str):
-    """Method name"""
+Method = str
+Params = Optional[Union[dict, list]]
 
 
 @dataclass
@@ -27,15 +27,15 @@ class Message:
 
 @dataclass
 class Notification(Message):
-    method: MethodName
-    params: Optional[Union[dict, list]] = None
+    method: Method
+    params: Params = None
 
 
 @dataclass
 class Request(Message):
     id: int
-    method: MethodName
-    params: Optional[Union[dict, list]] = None
+    method: Method
+    params: Params = None
 
 
 @dataclass
@@ -94,7 +94,7 @@ class RequestManager:
     """RequestManager manage method mapped to request_id."""
 
     def __init__(self):
-        self.methods_map: Dict[int, MethodName] = {}
+        self.methods_map: Dict[int, Method] = {}
         self.request_count = 0
 
         self._lock = threading.Lock()
@@ -104,7 +104,7 @@ class RequestManager:
             self.methods_map.clear()
             self.request_count = 0
 
-    def add(self, method: MethodName) -> int:
+    def add(self, method: Method) -> int:
         """add request method to request_map
 
         Return:
@@ -116,7 +116,7 @@ class RequestManager:
 
             return self.request_count
 
-    def pop(self, request_id: int) -> MethodName:
+    def pop(self, request_id: int) -> Method:
         """pop method paired with request_id
 
         Return:
@@ -131,7 +131,7 @@ class RequestManager:
             except KeyError as err:
                 raise RequestCanceled(request_id) from err
 
-    def cancel(self, method: MethodName) -> Optional[int]:
+    def cancel(self, method: Method) -> Optional[int]:
         """cancel older request
 
         Returns:
@@ -160,7 +160,7 @@ class RequestManager:
             self.methods_map.clear()
 
 
-MessageHandler = Callable[[MethodName, Union[dict, list]], Any]
+MessageHandler = Callable[[Method, Union[Params, Response]], Any]
 
 
 class MessagePool:
@@ -246,7 +246,7 @@ class MessagePool:
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
 
-    def send_request(self, method: MethodName, params: dict) -> None:
+    def send_request(self, method: Method, params: dict) -> None:
         # cancel previous request with same method
         if prev_request := self._request_manager.cancel(method):
             self.send_notification("$/cancelRequest", {"id": prev_request})
@@ -254,7 +254,7 @@ class MessagePool:
         req_id = self._request_manager.add(method)
         self.send_message(Request(req_id, method, params))
 
-    def send_notification(self, method: MethodName, params: dict) -> None:
+    def send_notification(self, method: Method, params: dict) -> None:
         if method in {
             "textDocument/didOpen",
             "textDocument/didChange",
