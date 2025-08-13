@@ -149,12 +149,12 @@ class DocumentCompletionMixins:
         except KeyError:
             insert_text = text
 
-        signature = completion_item.get("detail", "")
+        annotation = completion_item.get("detail", "")
         kind = COMPLETION_KIND_MAP[completion_item["kind"]]
 
         return sublime.CompletionItem.snippet_completion(
             trigger=text,
             snippet=insert_text,
-            annotation=signature,
+            annotation=annotation,
             kind=kind,
         )
