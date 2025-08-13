@@ -16,37 +16,35 @@ from ..constant import (
     COMMAND_PREFIX,
 )
 
-RowColIndex = namedtuple("RowColIndex", ["row", "column"])
+RowColumn = namedtuple("RowColumn", ["row", "column"])
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
 
 def is_valid_document(view: sublime.View) -> bool:
     """check if view is valid document"""
-
-    if not view.file_name():
-        return False
-    return view.match_selector(0, VIEW_SELECTOR)
+    return bool(view.file_name()) and view.match_selector(0, VIEW_SELECTOR)
 
 
 @dataclass
 class TextChange:
-    start: RowColIndex
-    end: RowColIndex
+    start: RowColumn
+    end: RowColumn
     text: str
     length: int
 
     __slots__ = ("start", "end", "text", "length")
 
-    def __post_init__(self):
-        # possibly if user pass 'start' and 'end' as tuple
-        self.start = RowColIndex(*self.start)
-        self.end = RowColIndex(*self.end)
-
 
 class Document:
+
     VIEW_SETTINGS = {
         "show_definitions": False,
         "auto_complete_use_index": False,
+    }
+    AUTO_COMPLETE_ARGUMENTS = {
+        "disable_auto_insert": True,
+        "next_completion_if_showing": True,
+        "auto_complete_commit_on_tab": True,
     }
 
     def __init__(self, view: sublime.View):
@@ -58,7 +56,6 @@ class Document:
         self._cached_completion = None
         self._cached_completion_lock = threading.Lock()
 
-    @property
     def window(self) -> sublime.Window:
         return self.view.window()
 
@@ -92,7 +89,7 @@ class Document:
     def show_completion(self, items: List[sublime.CompletionItem]):
         with self._cached_completion_lock:
             self._cached_completion = items
-        self._trigger_completion()
+        self.view.run_command("auto_complete", self.AUTO_COMPLETE_ARGUMENTS)
 
     def pop_completion(self) -> List[sublime.CompletionItem]:
         with self._cached_completion_lock:
@@ -104,25 +101,11 @@ class Document:
         with self._cached_completion_lock:
             return self._cached_completion is not None
 
-    auto_complete_arguments = {
-        "disable_auto_insert": True,
-        "next_completion_if_showing": True,
-        "auto_complete_commit_on_tab": True,
-    }
-
-    def _trigger_completion(self):
-        self.view.run_command(
-            "auto_complete",
-            self.auto_complete_arguments,
-        )
-
     def hide_completion(self):
         self.view.run_command("hide_auto_complete")
 
     def apply_changes(self, text_changes: List[TextChange]):
         self.view.run_command(
             f"{COMMAND_PREFIX}_apply_text_changes",
-            {
-                "changes": [asdict(c) for c in text_changes],
-            },
+            {"changes": [asdict(c) for c in text_changes]},
         )
