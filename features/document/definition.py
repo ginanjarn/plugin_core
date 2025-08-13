@@ -118,7 +118,7 @@ def open_document(
 
 def open_location(current_view: sublime.View, locations: List[PathEncodedStr]) -> None:
     """"""
-    window = current_view.window()
+    current_window = current_view.window()
     current_selections = list(current_view.sel())
     current_visible_region = current_view.visible_region()
 
@@ -126,18 +126,18 @@ def open_location(current_view: sublime.View, locations: List[PathEncodedStr]) -
 
     def open_location(index):
         if index >= 0:
-            open_document(window, locations[index])
+            open_document(current_window, locations[index])
             return
 
         # else: revert to current state
-        current_view.window().focus_view(current_view)
+        current_window.focus_view(current_view)
         set_selection(current_view, current_selections)
         current_view.show(current_visible_region, show_surrounds=False)
 
     def preview_location(index):
-        open_document(window, locations[index], preview=True)
+        open_document(current_window, locations[index], preview=True)
 
-    window.show_quick_panel(
+    current_window.show_quick_panel(
         items=locations,
         on_select=open_location,
         flags=sublime.MONOSPACE_FONT,
