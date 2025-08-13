@@ -4,7 +4,7 @@ import threading
 from collections import namedtuple, defaultdict
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Dict, List, Callable
+from typing import Dict, List
 
 import sublime
 
@@ -61,7 +61,7 @@ class DiagnosticManager:
         self.items_map: Dict[PathStr, List[DiagnosticItem]] = defaultdict(list)
 
         self.settings = settings or ReportSettings()
-        self.panel = DiagnosticPanel()
+        self.output_panel = DiagnosticOutputPanel()
 
         self._change_lock = threading.Lock()
         self._active_view: sublime.View = None
@@ -71,7 +71,7 @@ class DiagnosticManager:
         self._clear_all_regions()
         self._clear_all_status()
         self._active_view = None
-        self.panel.destroy()
+        self.output_panel.destroy()
         self.raw_itams_map.clear()
         self.items_map.clear()
 
@@ -125,7 +125,7 @@ class DiagnosticManager:
         if self.settings.show_status:
             self._show_status(view, diagnostic_items)
         if self.settings.show_panel:
-            self._show_panel(self.panel, view, diagnostic_items)
+            self._show_panel(self.output_panel, view, diagnostic_items)
 
     @classmethod
     def _highlight_regions(
@@ -136,7 +136,7 @@ class DiagnosticManager:
             key=cls.REGIONS_KEY,
             regions=regions,
             scope="string",
-            icon="dot",
+            icon="circle",
             flags=sublime.DRAW_NO_FILL
             | sublime.DRAW_NO_OUTLINE
             | sublime.DRAW_SQUIGGLY_UNDERLINE,
@@ -152,7 +152,7 @@ class DiagnosticManager:
     @classmethod
     def _clear_all_status(cls):
         for window in sublime.windows():
-            # erase regions
+            # erase status
             for view in [v for v in window.views()]:
                 view.erase_status(cls.STATUS_KEY)
 
@@ -164,7 +164,7 @@ class DiagnosticManager:
 
     @staticmethod
     def _show_panel(
-        panel: "DiagnosticPanel",
+        panel: "DiagnosticOutputPanel",
         view: sublime.View,
         diagnostic_items: List[DiagnosticItem],
     ):
@@ -178,15 +178,16 @@ class DiagnosticManager:
         panel.show()
 
 
-class DiagnosticPanel:
-    OUTPUT_PANEL_NAME = f"{PACKAGE_NAME}_PANEL"
+class DiagnosticOutputPanel:
+
+    PANEL_NAME = f"{PACKAGE_NAME}_DIAGNOSTIC_PANEL"
     SETTINGS = {"gutter": False, "word_wrap": False}
 
     def __init__(self):
         self.panel: sublime.View = None
 
     def _create_panel(self):
-        self.panel = sublime.active_window().create_output_panel(self.OUTPUT_PANEL_NAME)
+        self.panel = sublime.active_window().create_output_panel(self.PANEL_NAME)
         self.panel.settings().update(self.SETTINGS)
         self.panel.set_read_only(False)
 
@@ -206,10 +207,10 @@ class DiagnosticPanel:
     def show(self) -> None:
         """show output panel"""
         sublime.active_window().run_command(
-            "show_panel", {"panel": f"output.{self.OUTPUT_PANEL_NAME}"}
+            "show_panel", {"panel": f"output.{self.PANEL_NAME}"}
         )
 
     def destroy(self):
         """destroy output panel"""
         for window in sublime.windows():
-            window.destroy_output_panel(self.OUTPUT_PANEL_NAME)
+            window.destroy_output_panel(self.PANEL_NAME)
