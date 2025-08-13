@@ -2,7 +2,7 @@
 
 import threading
 from dataclasses import dataclass
-from functools import wraps, lru_cache
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Dict, List, Callable, Any, Union
 import sublime
@@ -107,17 +107,6 @@ class BaseClient:
     def is_ready(self) -> bool:
         """check session is ready"""
         return self.server.is_running() and self.session.is_initialized()
-
-    def must_initialized(func):
-        """exec if initialized"""
-
-        @wraps(func)
-        def wrapper(self, *args, **kwargs):
-            if not self.session.is_initialized():
-                return None
-            return func(self, *args, **kwargs)
-
-        return wrapper
 
     def terminate(self) -> None:
         """terminate session"""
