@@ -4,7 +4,7 @@ import threading
 from collections import namedtuple, defaultdict
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Set, Callable
 
 import sublime
 
@@ -46,11 +46,26 @@ class ReportSettings:
     show_panel: bool = False
 
 
+class PubSub:
+    def __init__(self) -> None:
+        self._subscribers: Dict[str, Set[Callable[..., None]]] = dict()
+
+    def subscribe(self, subject: str, callback: Callable[..., None]):
+        try:
+            self._subscribers[subject].add(callback)
+        except KeyError:
+            self._subscribers[subject] = {callback}
+
+    def publish(self, subject: str, *args, **kwargs) -> None:
+        for callback in self._subscribers.get(subject, []):
+            callback(*args, **kwargs)
+
+
 class DiagnosticManager:
     """"""
 
-    REGIONS_KEY = f"{PACKAGE_NAME}_DIAGNOSTIC_REGIONS"
-    STATUS_KEY = f"{PACKAGE_NAME}_DIAGNOSTIC_STATUS"
+    PUBLISH_KEY = "publish_diagnostic"
+    CLEAR_KEY = "clear_diagnostic"
 
     def __init__(self, settings: ReportSettings = None) -> None:
         # One file may be openend in many View. For efficiency reason,
@@ -60,18 +75,40 @@ class DiagnosticManager:
         self.raw_itams_map: Dict[PathStr, List[dict]] = defaultdict(list)
         self.items_map: Dict[PathStr, List[DiagnosticItem]] = defaultdict(list)
 
-        self.settings = settings or ReportSettings()
-        self.output_panel = DiagnosticOutputPanel()
+        self.report_publisher = PubSub()
+        self.config_reporter(settings)
 
         self._change_lock = threading.Lock()
         self._active_view: sublime.View = None
 
+    def config_reporter(self, settings: ReportSettings = None):
+        settings = settings or ReportSettings()
+
+        if settings.highlight_text:
+            key = f"{PACKAGE_NAME}_DIAGNOSTIC_REGIONS"
+            highlighter = SyntaxHighlighter(key)
+            self.report_publisher.subscribe(
+                self.PUBLISH_KEY, highlighter.highlight_text
+            )
+            self.report_publisher.subscribe(self.CLEAR_KEY, highlighter.clear)
+
+        if settings.show_status:
+            key = f"{PACKAGE_NAME}_DIAGNOSTIC_STATUS"
+            status_reporter = StatusReporter(key)
+            self.report_publisher.subscribe(
+                self.PUBLISH_KEY, status_reporter.show_status
+            )
+            self.report_publisher.subscribe(self.CLEAR_KEY, status_reporter.clear)
+
+        if settings.show_panel:
+            panel = OutputPanelReporter(PACKAGE_NAME)
+            self.report_publisher.subscribe(self.PUBLISH_KEY, panel.show_panel)
+            self.report_publisher.subscribe(self.CLEAR_KEY, panel.destroy)
+
     def reset(self):
-        # clear all regions before diagnostics_map cleared
-        self._clear_all_regions()
-        self._clear_all_status()
+        self.report_publisher.publish(self.CLEAR_KEY)
+
         self._active_view = None
-        self.output_panel.destroy()
         self.raw_itams_map.clear()
         self.items_map.clear()
 
@@ -92,7 +129,7 @@ class DiagnosticManager:
             self.items_map[view.file_name()] = [
                 DiagnosticItem.from_rpc(view, d) for d in diagnostics
             ]
-            self._show_report(view)
+        self._show_report(view)
 
     def remove(self, view: sublime.View):
         """remove diagnostics"""
@@ -102,7 +139,7 @@ class DiagnosticManager:
                 del self.items_map[view.file_name()]
             except KeyError:
                 pass
-            self._show_report(view)
+        self._show_report(view)
 
     def set_active_view(self, view: sublime.View):
         """set active view"""
@@ -119,21 +156,19 @@ class DiagnosticManager:
             return
 
         diagnostic_items = self.items_map[view.file_name()]
+        self.report_publisher.publish(self.PUBLISH_KEY, view, diagnostic_items)
 
-        if self.settings.highlight_text:
-            self._highlight_regions(view, diagnostic_items)
-        if self.settings.show_status:
-            self._show_status(view, diagnostic_items)
-        if self.settings.show_panel:
-            self._show_panel(self.output_panel, view, diagnostic_items)
 
-    @classmethod
-    def _highlight_regions(
-        cls, view: sublime.View, diagnostic_items: List[DiagnosticItem]
+class SyntaxHighlighter:
+    def __init__(self, region_key: str) -> None:
+        self._region_key = region_key
+
+    def highlight_text(
+        self, view: sublime.View, diagnostic_items: List[DiagnosticItem]
     ):
         regions = [item.region for item in diagnostic_items]
         view.add_regions(
-            key=cls.REGIONS_KEY,
+            key=self._region_key,
             regions=regions,
             scope="string",
             icon="circle",
@@ -142,29 +177,33 @@ class DiagnosticManager:
             | sublime.DRAW_SQUIGGLY_UNDERLINE,
         )
 
-    @classmethod
-    def _clear_all_regions(cls):
+    def clear(self):
         for window in sublime.windows():
-            # erase regions
             for view in [v for v in window.views()]:
-                view.erase_regions(cls.REGIONS_KEY)
+                view.erase_regions(self._region_key)
 
-    @classmethod
-    def _clear_all_status(cls):
-        for window in sublime.windows():
-            # erase status
-            for view in [v for v in window.views()]:
-                view.erase_status(cls.STATUS_KEY)
 
-    @classmethod
-    def _show_status(cls, view: sublime.View, diagnostic_items: List[DiagnosticItem]):
+class StatusReporter:
+    def __init__(self, status_key: str) -> None:
+        self._status_key = status_key
+
+    def show_status(self, view: sublime.View, diagnostic_items: List[DiagnosticItem]):
         err_count = len([item for item in diagnostic_items if item.severity == 1])
         warn_count = len([item for item in diagnostic_items if item.severity == 2])
-        view.set_status(cls.STATUS_KEY, f"Errors {err_count}, Warnings {warn_count}")
+        view.set_status(self._status_key, f"Errors {err_count}, Warnings {warn_count}")
 
-    @staticmethod
-    def _show_panel(
-        panel: "DiagnosticOutputPanel",
+    def clear(self):
+        for window in sublime.windows():
+            for view in [v for v in window.views()]:
+                view.erase_status(self._status_key)
+
+
+class OutputPanelReporter:
+    def __init__(self, panel_name: str) -> None:
+        self._panel = OutputPanel(panel_name)
+
+    def show_panel(
+        self,
         view: sublime.View,
         diagnostic_items: List[DiagnosticItem],
     ):
@@ -174,20 +213,22 @@ class DiagnosticManager:
             return f"{short_name}:{row+1}:{col} {item.message}"
 
         content = "\n".join([build_line(view, item) for item in diagnostic_items])
-        panel.set_content(content)
-        panel.show()
+        self._panel.set_content(content)
+        self._panel.show()
+
+    def destroy(self):
+        self._panel.destroy()
 
 
-class DiagnosticOutputPanel:
-
-    PANEL_NAME = f"{PACKAGE_NAME}_DIAGNOSTIC_PANEL"
+class OutputPanel:
     SETTINGS = {"gutter": False, "word_wrap": False}
 
-    def __init__(self):
+    def __init__(self, panel_name: str):
+        self.panel_name = panel_name
         self.panel: sublime.View = None
 
     def _create_panel(self):
-        self.panel = sublime.active_window().create_output_panel(self.PANEL_NAME)
+        self.panel = sublime.active_window().create_output_panel(self.panel_name)
         self.panel.settings().update(self.SETTINGS)
         self.panel.set_read_only(False)
 
@@ -207,10 +248,10 @@ class DiagnosticOutputPanel:
     def show(self) -> None:
         """show output panel"""
         sublime.active_window().run_command(
-            "show_panel", {"panel": f"output.{self.PANEL_NAME}"}
+            "show_panel", {"panel": f"output.{self.panel_name}"}
         )
 
     def destroy(self):
         """destroy output panel"""
         for window in sublime.windows():
-            window.destroy_output_panel(self.PANEL_NAME)
+            window.destroy_output_panel(self.panel_name)
