@@ -7,7 +7,7 @@ import threading
 from functools import wraps
 from io import BytesIO
 from pathlib import Path
-from typing import List, Optional, Union, Callable, Any
+from typing import List, Tuple, Optional, Union, Callable, Any
 
 if os.name == "nt":
     STARTUPINFO = subprocess.STARTUPINFO()
@@ -18,9 +18,8 @@ else:
 
 
 def recover_exception(
-    default_factory: Callable[[Any], Any],
-    *,
-    exceptions: Optional[Union[Exception, tuple]] = None,
+    default_factory: Callable[[], Any],
+    exceptions: Optional[Union[Exception, Tuple[Exception, ...]]] = None,
 ):
     """return default value if exception raised
 
