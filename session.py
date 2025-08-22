@@ -9,7 +9,7 @@ import sublime
 
 from ..constant import LOGGING_CHANNEL
 from .document import Document
-from .diagnostics import DiagnosticManager, ReportSettings
+from .diagnostics import DiagnosticManager
 
 
 MethodName = str
@@ -17,17 +17,25 @@ PathStr = str
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
 
-class DocumentManager:
+class SessionBase:
+    """Session Base class"""
+
+    def __init__(self, **kwargs) -> None:
+        # prevent inherited class call 'object.__init__'
+        pass
+
+
+class DocumentManager(SessionBase):
     """"""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
 
         self.working_documents: Dict[PathStr, Document] = {}
         self._working_documents_lock = threading.Lock()
 
         # Diagnostic manager
-        self.diagnostic_manager = DiagnosticManager(ReportSettings(show_panel=False))
+        self.diagnostic_manager = DiagnosticManager(kwargs.get("report_settings"))
 
     def get_document(
         self, file_name: PathStr, /, default: Any = None
@@ -85,11 +93,12 @@ class InitializeStatus(Enum):
     Initialized = 2
 
 
-class InitializeManager:
+class InitializeManager(SessionBase):
     """"""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+
         self._initialize_status = InitializeStatus.NotInitialized
 
     def is_initializing(self) -> bool:
@@ -108,8 +117,8 @@ class InitializeManager:
 class Session(DocumentManager, InitializeManager):
     """Session"""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
 
     def reset(self):
         """"""

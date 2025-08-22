@@ -8,6 +8,7 @@ from typing import Optional, Dict, List, Callable, Any, Union
 import sublime
 
 from .child_process import ChildProcess
+from .diagnostics import ReportSettings
 from .errors import MethodNotFound
 from .message import (
     MessagePool,
@@ -40,7 +41,12 @@ def normalize_method(method: Method) -> str:
 class BaseClient:
     """"""
 
-    def __init__(self, arguments: ServerArguments, transport_cls: Transport):
+    def __init__(
+        self,
+        arguments: ServerArguments,
+        transport_cls: Transport,
+        report_settings: ReportSettings = None,
+    ):
         self.server = ChildProcess(arguments.command, arguments.cwd)
         self.message_pool = MessagePool(transport_cls(self.server), self.handle)
 
@@ -51,7 +57,7 @@ class BaseClient:
         self._set_default_handler()
 
         # session data
-        self.session = Session()
+        self.session = Session(report_settings=report_settings)
 
     def _set_default_handler(self):
         # Register all callable attribute starts with 'handle_' as default
