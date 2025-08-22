@@ -236,6 +236,8 @@ class OutputPanel:
         if not (self.panel and self.panel.is_valid()):
             self._create_panel()
 
+        # clear selection in output panel
+        self.panel.sel().clear()
         start = (0, 0)
         end = self.panel.rowcol(self.panel.size())
 
