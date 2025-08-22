@@ -34,6 +34,9 @@ def wrap_rpc(content: bytes) -> bytes:
     return b"%s%s%s" % (header, separator, content)
 
 
+CONTENT_LENGTH_REGEX = re.compile(rb"Content-Length: (\d+)")
+
+
 def get_content_length(header: bytes) -> int:
     """get content length from header
 
@@ -42,9 +45,8 @@ def get_content_length(header: bytes) -> int:
     Raises:
         ValueError if content length not found
     """
-    pattern = re.compile(rb"Content-Length: (\d+)")
     for line in header.splitlines():
-        if match := pattern.match(line):
+        if match := CONTENT_LENGTH_REGEX.match(line):
             return int(match.group(1))
 
     raise ValueError("unable get 'Content-Length'")
