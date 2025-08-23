@@ -80,11 +80,11 @@ class DocumentHoverMixins:
                 },
             )
 
-    def handle_textdocument_hover(self, session: Session, params: Response):
-        if err := params.error:
+    def handle_textdocument_hover(self, session: Session, response: Response):
+        if err := response.error:
             print(err["message"])
 
-        elif result := params.result:
+        elif result := response.result:
             message = result["contents"]["value"]
             row, col = LineCharacter(**result["range"]["start"])
             self.hover_target.show_popup(message, row, col)

@@ -88,10 +88,10 @@ class DocumentRenameMixins:
                 },
             )
 
-    def handle_textdocument_preparerename(self, session: Session, params: Response):
-        if error := params.error:
+    def handle_textdocument_preparerename(self, session: Session, response: Response):
+        if error := response.error:
             print(error["message"])
-        elif result := params.result:
+        elif result := response.result:
             self._prompt_rename(session, result)
 
     def _prompt_rename(self, session: Session, symbol_range: dict):
@@ -138,10 +138,10 @@ class DocumentRenameMixins:
                 },
             )
 
-    def handle_textdocument_rename(self, session: Session, params: Response):
-        if error := params.error:
+    def handle_textdocument_rename(self, session: Session, response: Response):
+        if error := response.error:
             print(error["message"])
-        elif result := params.result:
+        elif result := response.result:
             changes = self._get_changes(result)
             WorkspaceEdit(session).apply_changes(changes)
 

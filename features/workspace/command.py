@@ -36,11 +36,11 @@ class WorkspaceExecuteCommandMixins:
         self.message_pool.send_request("workspace/executeCommand", commands)
 
     def handle_workspace_executecommand(
-        self, session: Session, params: Response
+        self, session: Session, response: Response
     ) -> dict:
-        if error := params.error:
+        if error := response.error:
             print(error["message"])
-        elif result := params.result:
+        elif result := response.result:
             LOGGER.info(result)
 
         return None

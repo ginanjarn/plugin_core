@@ -76,11 +76,11 @@ class DocumentCodeActionMixins:
                 },
             )
 
-    def handle_textdocument_codeaction(self, session: Session, params: Response):
-        if err := params.error:
+    def handle_textdocument_codeaction(self, session: Session, response: Response):
+        if err := response.error:
             print(err["message"])
 
-        elif result := params.result:
+        elif result := response.result:
             self.show_action_panels(session, result)
 
     def show_action_panels(self, session: Session, code_actions: List[dict]):

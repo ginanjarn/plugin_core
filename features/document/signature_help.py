@@ -91,11 +91,11 @@ class DocumentSignatureHelpMixins:
                 },
             )
 
-    def handle_textdocument_signaturehelp(self, session: Session, params: Response):
-        if err := params.error:
+    def handle_textdocument_signaturehelp(self, session: Session, response: Response):
+        if err := response.error:
             print(err["message"])
 
-        elif result := params.result:
+        elif result := response.result:
             signatures = result["signatures"]
             if not signatures:
                 return

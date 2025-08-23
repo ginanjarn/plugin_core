@@ -133,11 +133,11 @@ class DocumentCompletionMixins:
                 },
             )
 
-    def handle_textdocument_completion(self, session: Session, params: Response):
-        if err := params.error:
+    def handle_textdocument_completion(self, session: Session, response: Response):
+        if err := response.error:
             print(err["message"])
 
-        elif result := params.result:
+        elif result := response.result:
             items = [self._build_completion(item) for item in result["items"]]
             self.completion_target.show_completion(items)
 

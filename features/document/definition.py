@@ -84,10 +84,10 @@ class DocumentDefinitionMixins:
                 },
             )
 
-    def handle_textdocument_definition(self, session: Session, params: Response):
-        if error := params.error:
+    def handle_textdocument_definition(self, session: Session, response: Response):
+        if error := response.error:
             print(error["message"])
-        elif result := params.result:
+        elif result := response.result:
             view = self.definition_target.view
             locations = [self._build_location(l) for l in result]
             open_location(view, locations)

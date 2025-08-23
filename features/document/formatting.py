@@ -60,10 +60,10 @@ class DocumentFormattingMixins:
                 },
             )
 
-    def handle_textdocument_formatting(self, session: Session, params: Response):
-        if error := params.error:
+    def handle_textdocument_formatting(self, session: Session, response: Response):
+        if error := response.error:
             print(error["message"])
-        elif result := params.result:
+        elif result := response.result:
             changes = [rpc_to_textchange(c) for c in result]
             self.formatting_target.apply_changes(changes)
 
