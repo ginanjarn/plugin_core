@@ -139,19 +139,12 @@ class RequestManager:
         """
 
         with self._lock:
-            canceled_id = None
+            if found := [id for id, meth in self.methods_map.items() if meth == method]:
+                canceled_id = found[0]
+                del self.methods_map[canceled_id]
+                return canceled_id
 
-            for req_id, meth in self.methods_map.items():
-                if meth == method:
-                    canceled_id = req_id
-                    break
-            else:
-                # no match found
-                return None
-
-            # delete after for loop to prevent RuntimeError("dictionary changed size during iteration")
-            del self.methods_map[canceled_id]
-            return canceled_id
+            return None
 
     def cancel_all(self):
         """cancel all request"""
