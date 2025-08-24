@@ -156,8 +156,7 @@ class RequestManager:
 MessageHandler = Callable[[Method, Union[Params, Response]], Any]
 
 
-class MessagePool:
-    """Client - Server Message Pool"""
+class MessageManager:
 
     def __init__(
         self,
@@ -174,6 +173,81 @@ class MessagePool:
     def send_message(self, message: Message) -> None:
         content = dumps(message, as_bytes=True)
         self.transport.write(content)
+
+    def listen(self) -> None:
+        self._reset_managers()
+
+        thread = threading.Thread(target=self._listen_task, daemon=True)
+        thread.start()
+
+
+class ClientMixins(MessageManager):
+
+    def send_request(self, method: Method, params: dict) -> None:
+        # cancel previous request with same method
+        if prev_request := self._request_manager.cancel(method):
+            self.send_notification("$/cancelRequest", {"id": prev_request})
+
+        req_id = self._request_manager.add(method)
+        self.send_message(Request(req_id, method, params))
+
+    def _handle_response(self, message: Response) -> None:
+        try:
+            method = self._request_manager.pop(message.id)
+        except (RequestCanceled, KeyError):
+            # ignore canceled response
+            return
+
+        try:
+            self.handle_func(method, message)
+        except Exception as err:
+            LOGGER.exception(err, exc_info=True)
+
+    def send_notification(self, method: Method, params: dict) -> None:
+        if method in {
+            "textDocument/didOpen",
+            "textDocument/didChange",
+        }:
+            # cancel all current request
+            self._request_manager.cancel_all()
+        self.send_message(Notification(method, params))
+
+
+class ServerMessageHandlerMixins(MessageManager):
+
+    def _handle_request(self, message: Request) -> None:
+        result = None
+        error = None
+        try:
+            result = self.handle_func(message.method, message.params)
+        except Exception as err:
+            LOGGER.exception(err, exc_info=True)
+            error = transform_error(err)
+
+        self._send_response(message.id, result, error)
+
+    def _send_response(
+        self, id: int, result: Optional[dict] = None, error: Optional[dict] = None
+    ) -> None:
+        self.send_message(Response(id, result, error))
+
+    def _handle_notification(self, message: Notification) -> None:
+        try:
+            self.handle_func(message.method, message.params)
+        except Exception as err:
+            LOGGER.exception(err, exc_info=True)
+
+
+class MessagePool(ClientMixins, ServerMessageHandlerMixins):
+    """Client - Server Message Pool"""
+
+    def handle_message(self, message: Message) -> None:
+        handler_map = {
+            Notification: self._handle_notification,
+            Request: self._handle_request,
+            Response: self._handle_response,
+        }
+        return handler_map[type(message)](message)
 
     def _listen_task(self) -> None:
 
@@ -195,68 +269,3 @@ class MessagePool:
                 self.handle_message(message)
             except Exception:
                 LOGGER.exception("error handle message: %r", message, exc_info=True)
-
-    def listen(self) -> None:
-        self._reset_managers()
-
-        thread = threading.Thread(target=self._listen_task, daemon=True)
-        thread.start()
-
-    def handle_message(self, message: Message) -> None:
-        handler_map = {
-            Notification: self._handle_notification,
-            Request: self._handle_request,
-            Response: self._handle_response,
-        }
-        return handler_map[type(message)](message)
-
-    def _handle_request(self, message: Request) -> None:
-        result = None
-        error = None
-        try:
-            result = self.handle_func(message.method, message.params)
-        except Exception as err:
-            LOGGER.exception(err, exc_info=True)
-            error = transform_error(err)
-
-        self.send_response(message.id, result, error)
-
-    def _handle_notification(self, message: Notification) -> None:
-        try:
-            self.handle_func(message.method, message.params)
-        except Exception as err:
-            LOGGER.exception(err, exc_info=True)
-
-    def _handle_response(self, message: Response) -> None:
-        try:
-            method = self._request_manager.pop(message.id)
-        except (RequestCanceled, KeyError):
-            # ignore canceled response
-            return
-
-        try:
-            self.handle_func(method, message)
-        except Exception as err:
-            LOGGER.exception(err, exc_info=True)
-
-    def send_request(self, method: Method, params: dict) -> None:
-        # cancel previous request with same method
-        if prev_request := self._request_manager.cancel(method):
-            self.send_notification("$/cancelRequest", {"id": prev_request})
-
-        req_id = self._request_manager.add(method)
-        self.send_message(Request(req_id, method, params))
-
-    def send_notification(self, method: Method, params: dict) -> None:
-        if method in {
-            "textDocument/didOpen",
-            "textDocument/didChange",
-        }:
-            # cancel all current request
-            self._request_manager.cancel_all()
-        self.send_message(Notification(method, params))
-
-    def send_response(
-        self, id: int, result: Optional[dict] = None, error: Optional[dict] = None
-    ) -> None:
-        self.send_message(Response(id, result, error))
