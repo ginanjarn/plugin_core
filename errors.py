@@ -1,99 +1,74 @@
-"""rpc errors"""
+"""json-rpc errors"""
 
 from typing import Union, Dict, Any, Optional
 
 
-class ContentIncomplete(ValueError):
-    """expected size less than defined"""
+class JSONRPCException(Exception):
+    """json-rpc exception base"""
+
+    def __init__(self, code: int, message: str, data: Optional[Any] = None) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.data = data
 
 
-class RPCException(Exception):
-    """base rpc exception"""
+ParseError = JSONRPCException(code=-32700, message="parse error")
+"""An error occurred while parsing the JSON text"""
 
-    code = 0
-    message = ""
+InvalidRequest = JSONRPCException(code=-32600, message="invalid request")
+"""The JSON sent is not a valid Request object"""
 
+MethodNotFound = JSONRPCException(code=-32601, message="method not found")
+"""The method does not exist / is not available"""
 
-class ParseError(RPCException):
-    """message not comply to jsonrpc 2.0 specification"""
+InvalidParams = JSONRPCException(code=-32602, message="invalid params")
+"""Invalid method parameter(s)"""
 
-    code = -32700
-    message = "parse error"
+InternalError = JSONRPCException(code=-32603, message="internal error")
+"""Internal JSON-RPC error"""
 
+ServerNotInitialized = JSONRPCException(-32002, "server not initialized")
+"""Server received a notification or request before the server received the `initialize` request"""
 
-class InvalidRequest(RPCException):
-    """invalid request"""
+UnknownErrorCode = JSONRPCException(-32001, "")
 
-    code = -32600
-    message = "invalid request"
+RequestFailed = JSONRPCException(-32803, "request failed")
+"""A request failed but it was syntactically correct"""
 
+ServerCancelled = JSONRPCException(-32802, "server cancelled")
+"""The server cancelled the request"""
 
-class MethodNotFound(RPCException):
-    """method not found"""
+ContentModified = JSONRPCException(-32801, "content modified")
+"""The content of a document got modified outside normal conditions"""
 
-    code = -32601
-    message = "method not found"
-
-
-class InvalidParams(RPCException):
-    """invalid params"""
-
-    code = -32602
-    message = "invalid params"
+RequestCancelled = JSONRPCException(-32800, "request cancelled")
+"""The client has canceled a request and a server has detected the cancel"""
 
 
-class InternalError(RPCException):
-    """internal error"""
+class ServerError(JSONRPCException):
+    """Reserved for implementation-defined server-errors"""
 
-    code = -32603
-    message = "internal error"
+    min_range = -32099
+    max_range = -32000
 
-
-class ServerNotInitialized(RPCException):
-    """workspace not initialize"""
-
-    code = -32002
-    message = "server not initialized"
-
-
-class InvalidResource(InternalError):
-    """invalid resource"""
-
-    message = "invalid resource"
-
-
-class RequestCancelled(RPCException):
-    """request canceled"""
-
-    message = "request canceled"
-    code = -32800
-
-
-class ContentModified(RPCException):
-    """content modified"""
-
-    message = "content modified"
-    code = -32801
-
-
-class FeatureDisabled(InternalError):
-    """feature disabled"""
-
-    message = "feature disabled"
+    def __init__(self, code: int, message: str, data: Optional[Any] = None) -> None:
+        if not (self.min_range < code < self.max_range):
+            raise ValueError(f"valid code {self.min_range} to {self.max_range}")
+        super().__init__(code, message, data)
 
 
 def transform_error(
-    error: Union[RPCException, Exception, None]
+    error: Union[JSONRPCException, Exception, None]
 ) -> Optional[Dict[str, Any]]:
     """transform exception to rpc error"""
 
     if not error:
         return None
 
-    code, message = None, None
     try:
         code = error.code
-        message = str(error) or error.message
+        message = error.message
 
     except AttributeError:
         # 'err.code' and 'err.message' may be not defined
