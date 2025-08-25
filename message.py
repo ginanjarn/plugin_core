@@ -6,10 +6,11 @@ from dataclasses import dataclass, asdict
 from json import (
     loads as json_loads,
     dumps as json_dumps,
+    JSONDecodeError,
 )
 from typing import Optional, Union, Dict, Callable, Any
 
-from .errors import transform_error
+from .errors import ParseError, transform_error
 from .transport import Transport
 from ..constant import LOGGING_CHANNEL
 
@@ -45,6 +46,10 @@ class Response(Message):
     error: Optional[dict] = None
 
 
+JSONRPC_KEY = "jsonrpc"
+JSONRPC_VERSION = "2.0"
+
+
 def loads(json_str: Union[str, bytes]) -> Message:
     """loads json-rpc message
 
@@ -53,18 +58,20 @@ def loads(json_str: Union[str, bytes]) -> Message:
       * ValueError if invalid jsonrpc version
     """
 
-    dct = json_loads(json_str)
     try:
-        if (jsonrpc_version := dct.pop("jsonrpc")) and jsonrpc_version != "2.0":
-            raise ValueError("invalid jsonrpc version")
-    except KeyError as err:
-        raise ValueError("JSON-RPC 2.0 is required") from err
+        dct = json_loads(json_str)
+    except JSONDecodeError as err:
+        raise ParseError from err
 
-    if dct.get("method"):
-        id = dct.get("id")
-        if id is None:
-            return Notification(**dct)
-        return Request(**dct)
+    version = dct.pop(JSONRPC_KEY, "1.0")
+    if version != JSONRPC_VERSION:
+        raise ValueError("invalid json-rpc version")
+
+    # Request and Notification contain 'method' key
+    if "method" in dct:
+        if "id" in dct:
+            return Request(**dct)
+        return Notification(**dct)
     return Response(**dct)
 
 
@@ -72,9 +79,10 @@ def dumps(message: Message, as_bytes: bool = False) -> Union[str, bytes]:
     """dumps json-rpc message"""
 
     dct = asdict(message)
-    dct["jsonrpc"] = "2.0"
+    dct[JSONRPC_KEY] = JSONRPC_VERSION
 
     if isinstance(message, Response):
+        # Response only contain one of 'result' or 'error' field
         if not message.error:
             del dct["error"]
         else:
@@ -84,10 +92,6 @@ def dumps(message: Message, as_bytes: bool = False) -> Union[str, bytes]:
     if as_bytes:
         return json_str.encode()
     return json_str
-
-
-class RequestCanceled(Exception):
-    """Request Canceled"""
 
 
 class RequestManager:
@@ -122,14 +126,11 @@ class RequestManager:
         Return:
             method: str
         Raises:
-            RequestCanceled if request_id not found
+            KeyError if request_id not found
         """
 
         with self._lock:
-            try:
-                return self.methods_map.pop(request_id)
-            except KeyError as err:
-                raise RequestCanceled(request_id) from err
+            return self.methods_map.pop(request_id)
 
     def cancel(self, method: Method) -> Optional[int]:
         """cancel older request
@@ -171,19 +172,26 @@ class MessageManager:
         self._request_manager.reset()
 
     def send_message(self, message: Message) -> None:
+        """send message"""
         content = dumps(message, as_bytes=True)
         self.transport.write(content)
 
     def listen(self) -> None:
+        """listen message"""
         self._reset_managers()
 
         thread = threading.Thread(target=self._listen_task, daemon=True)
         thread.start()
 
+    def _listen_task(self) -> None:
+        """listen message task"""
+        raise NotImplementedError
 
-class ClientMixins(MessageManager):
 
-    def send_request(self, method: Method, params: dict) -> None:
+class CommandInterfaceMixins(MessageManager):
+    """Command interface to control server"""
+
+    def send_request(self, method: Method, params: Params) -> None:
         # cancel previous request with same method
         if prev_request := self._request_manager.cancel(method):
             self.send_notification("$/cancelRequest", {"id": prev_request})
@@ -194,7 +202,7 @@ class ClientMixins(MessageManager):
     def _handle_response(self, message: Response) -> None:
         try:
             method = self._request_manager.pop(message.id)
-        except (RequestCanceled, KeyError):
+        except KeyError:
             # ignore canceled response
             return
 
@@ -203,7 +211,7 @@ class ClientMixins(MessageManager):
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
 
-    def send_notification(self, method: Method, params: dict) -> None:
+    def send_notification(self, method: Method, params: Params) -> None:
         if method in {
             "textDocument/didOpen",
             "textDocument/didChange",
@@ -213,7 +221,8 @@ class ClientMixins(MessageManager):
         self.send_message(Notification(method, params))
 
 
-class ServerMessageHandlerMixins(MessageManager):
+class ReceivedMessageHandlerMixins(MessageManager):
+    """Handle message received from server"""
 
     def _handle_request(self, message: Request) -> None:
         result = None
@@ -227,7 +236,7 @@ class ServerMessageHandlerMixins(MessageManager):
         self._send_response(message.id, result, error)
 
     def _send_response(
-        self, id: int, result: Optional[dict] = None, error: Optional[dict] = None
+        self, id: int, result: Optional[Any] = None, error: Optional[dict] = None
     ) -> None:
         self.send_message(Response(id, result, error))
 
@@ -238,7 +247,7 @@ class ServerMessageHandlerMixins(MessageManager):
             LOGGER.exception(err, exc_info=True)
 
 
-class MessagePool(ClientMixins, ServerMessageHandlerMixins):
+class MessagePool(CommandInterfaceMixins, ReceivedMessageHandlerMixins):
     """Client - Server Message Pool"""
 
     def handle_message(self, message: Message) -> None:
