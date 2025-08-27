@@ -68,7 +68,7 @@ class DocumentHoverMixins:
 
         if document := self.session.get_document(view.file_name()):
             if message := self._get_diagnostic_message(view, row, col):
-                document.show_popup(message, row, col)
+                self.show_popup(view, message, row, col)
                 return
 
             self.hover_target = document
@@ -87,7 +87,26 @@ class DocumentHoverMixins:
         elif result := response.result:
             message = result["contents"]["value"]
             row, col = LineCharacter(**result["range"]["start"])
-            self.hover_target.show_popup(message, row, col)
+            self.show_popup(self.hover_target.view, message, row, col)
+
+    @staticmethod
+    def show_popup(
+        view: sublime.View,
+        text: str,
+        row: int,
+        col: int,
+        keep_visible: bool = False,
+    ):
+        point = view.text_point(row, col)
+        view.run_command(
+            "marked_popup",
+            {
+                "location": point,
+                "text": text,
+                "markup": "markdown",
+                "keep_visible": keep_visible,
+            },
+        )
 
     def _get_diagnostic_message(self, view: sublime.View, row: int, col: int):
         point = view.text_point(row, col)

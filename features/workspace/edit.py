@@ -1,11 +1,12 @@
 import logging
 from collections import namedtuple
+from dataclasses import asdict
 from pathlib import Path
 from typing import List, Iterator
 
 import sublime
 
-from ....constant import LOGGING_CHANNEL
+from ....constant import LOGGING_CHANNEL, COMMAND_PREFIX
 from ...document import TextChange
 from ...session import Session
 from ...uri import uri_to_path
@@ -67,10 +68,18 @@ class WorkspaceEdit:
         changes = [rpc_to_textchange(c) for c in document_changes["edits"]]
 
         if document := self.session.get_document(file_name):
-            document.apply_changes(changes)
-            document.save()
+            view = document.view
+            self.apply_view_changes(view, changes)
+            view.run_command("save")
         else:
             FileUpdater(file_name).apply(changes)
+
+    @staticmethod
+    def apply_view_changes(view: sublime.View, text_changes: List[TextChange]):
+        view.run_command(
+            f"{COMMAND_PREFIX}_apply_text_changes",
+            {"changes": [asdict(c) for c in text_changes]},
+        )
 
     @staticmethod
     def _create_document(resource_changes: dict):

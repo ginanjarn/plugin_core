@@ -119,6 +119,12 @@ def must_initialized(func):
 
 class DocumentCompletionMixins:
 
+    AUTO_COMPLETE_ARGUMENTS = {
+        "disable_auto_insert": True,
+        "next_completion_if_showing": True,
+        "auto_complete_commit_on_tab": True,
+    }
+
     completion_target = None
 
     @must_initialized
@@ -139,7 +145,10 @@ class DocumentCompletionMixins:
 
         elif result := response.result:
             items = [self._build_completion(item) for item in result["items"]]
-            self.completion_target.show_completion(items)
+            self.completion_target.set_completion(items)
+
+            view = self.completion_target.view
+            view.run_command("auto_complete", self.AUTO_COMPLETE_ARGUMENTS)
 
     @staticmethod
     def _build_completion(completion_item: dict) -> sublime.CompletionItem:

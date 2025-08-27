@@ -1,8 +1,11 @@
 from collections import namedtuple
+from dataclasses import asdict
 from functools import wraps
+from typing import List
 import sublime
 import sublime_plugin
 
+from ....constant import COMMAND_PREFIX
 from ...document import is_valid_document, TextChange
 from ...message import Response
 from ...session import Session
@@ -65,7 +68,14 @@ class DocumentFormattingMixins:
             print(error["message"])
         elif result := response.result:
             changes = [rpc_to_textchange(c) for c in result]
-            self.formatting_target.apply_changes(changes)
+            self.apply_view_changes(self.formatting_target.view, changes)
+
+    @staticmethod
+    def apply_view_changes(view: sublime.View, text_changes: List[TextChange]):
+        view.run_command(
+            f"{COMMAND_PREFIX}_apply_text_changes",
+            {"changes": [asdict(c) for c in text_changes]},
+        )
 
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])

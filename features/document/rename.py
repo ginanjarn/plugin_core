@@ -125,7 +125,7 @@ class DocumentRenameMixins:
     def textdocument_rename(self, view, row, col, new_name):
         # Save all changes before perform rename
         for document in self.session.get_documents():
-            document.save()
+            document.view.run_command("save")
 
         if document := self.session.get_document(view.file_name()):
             self.rename_target = document

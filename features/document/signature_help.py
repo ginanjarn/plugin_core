@@ -109,4 +109,23 @@ class DocumentSignatureHelpMixins:
             )
             view = self.signature_help_target.view
             row, col = view.rowcol(view.sel()[0].a)
-            self.signature_help_target.show_popup(message, row, col)
+            self.show_popup(view, message, row, col)
+
+    @staticmethod
+    def show_popup(
+        view: sublime.View,
+        text: str,
+        row: int,
+        col: int,
+        keep_visible: bool = False,
+    ):
+        point = view.text_point(row, col)
+        view.run_command(
+            "marked_popup",
+            {
+                "location": point,
+                "text": text,
+                "markup": "markdown",
+                "keep_visible": keep_visible,
+            },
+        )
