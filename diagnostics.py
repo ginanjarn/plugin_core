@@ -76,12 +76,12 @@ class DiagnosticManager:
         self.items_map: Dict[PathStr, List[DiagnosticItem]] = defaultdict(list)
 
         self.report_publisher = PubSub()
-        self.config_reporter(settings)
+        self.register_reporter(settings)
 
         self._change_lock = threading.Lock()
         self._active_view: sublime.View = None
 
-    def config_reporter(self, settings: ReportSettings = None):
+    def register_reporter(self, settings: ReportSettings = None):
         settings = settings or ReportSettings()
 
         if settings.highlight_text:
