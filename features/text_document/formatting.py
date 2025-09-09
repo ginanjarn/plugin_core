@@ -53,7 +53,7 @@ class DocumentFormattingMixins:
 
     @must_initialized
     def textdocument_formatting(self, view):
-        if document := self.session.get_document(view.file_name()):
+        if document := self.session.get_document(view):
             self.formatting_target = document
             self.message_pool.send_request(
                 "textDocument/formatting",

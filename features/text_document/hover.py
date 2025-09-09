@@ -66,7 +66,7 @@ class DocumentHoverMixins:
         if other := self.hover_target:
             other.view.hide_popup()
 
-        if document := self.session.get_document(view.file_name()):
+        if document := self.session.get_document(view):
             if message := self._get_diagnostic_message(view, row, col):
                 self.show_popup(view, message, row, col)
                 return

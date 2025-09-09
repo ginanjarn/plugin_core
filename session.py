@@ -5,7 +5,7 @@ import threading
 from enum import Enum
 from typing import Optional, Dict, List, Any, Callable
 
-import sublime
+from sublime import View
 
 from ..constant import LOGGING_CHANNEL
 from .document import Document
@@ -31,43 +31,46 @@ class DocumentManager(SessionBase):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
-        self.working_documents: Dict[PathStr, Document] = {}
+        # In Sublime Text one buffer may associated to multiple view.
+        # For example in 2 column layout, one file opened in 2 column.
+        # Map 'working_documents' with View, it's easier to manage action target
+        # such hover to decide where popup must be shown.
+
+        self.working_documents: Dict[View, Document] = {}
         self._working_documents_lock = threading.Lock()
 
         # Diagnostic manager
         self.diagnostic_manager = DiagnosticManager(kwargs.get("report_settings"))
 
     def get_document(
-        self, file_name: PathStr, /, default: Any = None
+        self, view: View, /, default: Optional[Any] = None
     ) -> Optional[Document]:
         with self._working_documents_lock:
             try:
-                return self.working_documents[file_name]
+                return self.working_documents[view]
             except KeyError:
                 return default
 
+    def get_document_with_name(
+        self, file_name: PathStr, /, default: Optional[Any] = None
+    ) -> Optional[Document]:
+        with self._working_documents_lock:
+            for _, document in self.working_documents.items():
+                if document.file_name == file_name:
+                    return document
+            return default
+
     def add_document(self, document: Document) -> None:
         with self._working_documents_lock:
-            self.working_documents[document.file_name] = document
+            self.working_documents[document.view] = document
 
-    def remove_document(self, file_name: PathStr) -> None:
+    def remove_document(self, view: View) -> None:
         with self._working_documents_lock:
             try:
-                del self.working_documents[file_name]
+                del self.working_documents[view]
             except KeyError as err:
                 LOGGER.debug("document not found %s", err)
                 pass
-
-    def get_document_by_view(
-        self, view: sublime.View, /, default: Any = None
-    ) -> Optional[Document]:
-        """get document by view"""
-
-        with self._working_documents_lock:
-            for _, document in self.working_documents.items():
-                if document.view == view:
-                    return document
-            return default
 
     def get_documents(
         self, filter_func: Optional[Callable[[Document], bool]] = None

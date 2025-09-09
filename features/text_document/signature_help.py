@@ -81,7 +81,7 @@ class DocumentSignatureHelpMixins:
 
     @must_initialized
     def textdocument_signaturehelp(self, view, row, col):
-        if document := self.session.get_document(view.file_name()):
+        if document := self.session.get_document(view):
             self.signature_help_target = document
             self.message_pool.send_request(
                 "textDocument/signatureHelp",

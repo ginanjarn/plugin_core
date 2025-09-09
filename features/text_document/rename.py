@@ -78,7 +78,7 @@ class DocumentRenameMixins:
 
     @must_initialized
     def textdocument_preparerename(self, view, row, col):
-        if document := self.session.get_document(view.file_name()):
+        if document := self.session.get_document(view):
             self.rename_target = document
             self.message_pool.send_request(
                 "textDocument/prepareRename",
@@ -127,7 +127,7 @@ class DocumentRenameMixins:
         for document in self.session.get_documents():
             document.view.run_command("save")
 
-        if document := self.session.get_document(view.file_name()):
+        if document := self.session.get_document(view):
             self.rename_target = document
             self.message_pool.send_request(
                 "textDocument/rename",

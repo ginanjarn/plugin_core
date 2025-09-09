@@ -129,7 +129,7 @@ class DocumentCompletionMixins:
 
     @must_initialized
     def textdocument_completion(self, view, row, col):
-        if document := self.session.get_document(view.file_name()):
+        if document := self.session.get_document(view):
             self.completion_target = document
             self.message_pool.send_request(
                 "textDocument/completion",

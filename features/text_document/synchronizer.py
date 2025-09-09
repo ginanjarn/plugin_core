@@ -117,11 +117,10 @@ class DocumentSynchronizerMixins:
         if not (view and view.is_valid()):
             return
 
-        file_name = view.file_name()
         self.session.diagnostic_manager.set_active_view(view)
 
         # Check if document has opened
-        if self.session.get_document(file_name):
+        if self.session.get_document(view):
             if not reload:
                 return
 
@@ -129,24 +128,29 @@ class DocumentSynchronizerMixins:
             self.textdocument_didclose(view)
 
         document = Document(view)
-        self.message_pool.send_notification(
-            "textDocument/didOpen",
-            {
-                "textDocument": {
-                    "languageId": document.language_id,
-                    "text": document.text,
-                    "uri": path_to_uri(document.file_name),
-                    "version": document.version,
-                }
-            },
-        )
+
+        # Check if the document has opened in other view
+        other = self.session.get_document_with_name(view.file_name())
+        if not other:
+            # Notify server to open document
+            self.message_pool.send_notification(
+                "textDocument/didOpen",
+                {
+                    "textDocument": {
+                        "languageId": document.language_id,
+                        "text": document.text,
+                        "uri": path_to_uri(document.file_name),
+                        "version": document.version,
+                    }
+                },
+            )
 
         # Add current document
         self.session.add_document(document)
 
     @must_initialized
     def textdocument_didsave(self, view: sublime.View):
-        if document := self.session.get_document(view.file_name()):
+        if document := self.session.get_document(view):
             self.message_pool.send_notification(
                 "textDocument/didSave",
                 {"textDocument": {"uri": path_to_uri(document.file_name)}},
@@ -158,25 +162,28 @@ class DocumentSynchronizerMixins:
 
     @must_initialized
     def textdocument_didclose(self, view: sublime.View):
-        self.session.diagnostic_manager.remove(view)
-        file_name = view.file_name()
 
-        # if document still opened in other View
-        for iterview in sublime.active_window().views():
-            if iterview.file_name() == file_name:
-                return
+        # Check if the document open in multiple view like side-by-side layout
+        documents = self.session.get_documents(
+            filter_func=lambda doc: doc.file_name == view.file_name()
+        )
+        if len(documents) > 1:
+            # Remove the document but don't notify to server
+            self.session.remove_document(view)
+            return
 
-        if document := self.session.get_document(file_name):
-            self.session.remove_document(file_name)
+        if document := self.session.get_document(view):
             self.message_pool.send_notification(
                 "textDocument/didClose",
                 {"textDocument": {"uri": path_to_uri(document.file_name)}},
             )
 
+        self.session.diagnostic_manager.remove(view)
+        self.session.remove_document(view)
+
     @must_initialized
     def textdocument_didchange(self, view: sublime.View, changes: List[TextChange]):
-        file_name = view.file_name()
-        if document := self.session.get_document(file_name):
+        if document := self.session.get_document(view):
             self.message_pool.send_notification(
                 "textDocument/didChange",
                 {

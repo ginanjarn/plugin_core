@@ -67,7 +67,7 @@ class WorkspaceEdit:
         file_name = uri_to_path(document_changes["textDocument"]["uri"])
         changes = [rpc_to_textchange(c) for c in document_changes["edits"]]
 
-        if document := self.session.get_document(file_name):
+        if document := self.session.get_document_with_name(file_name):
             view = document.view
             self.apply_view_changes(view, changes)
             view.run_command("save")

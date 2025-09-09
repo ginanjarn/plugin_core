@@ -51,7 +51,7 @@ class DocumentCodeActionMixins:
 
     @must_initialized
     def textdocument_codeaction(self, view, region, action_kinds=None):
-        if document := self.session.get_document(view.file_name()):
+        if document := self.session.get_document(view):
             self.code_action_target = document
             start = view.rowcol(region.begin())
             end = view.rowcol(region.end())
