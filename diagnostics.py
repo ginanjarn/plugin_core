@@ -130,7 +130,7 @@ class DiagnosticManager:
             self.items_map[view.file_name()] = [
                 DiagnosticItem.from_rpc(view, d) for d in diagnostics
             ]
-        self._show_report(view)
+            self._show_report(view)
 
     def remove(self, view: sublime.View):
         """remove diagnostics"""
@@ -140,7 +140,7 @@ class DiagnosticManager:
                 del self.items_map[view.file_name()]
             except KeyError:
                 pass
-        self._show_report(view)
+            self._show_report(view)
 
     def set_active_view(self, view: sublime.View):
         """set active view"""
@@ -148,16 +148,16 @@ class DiagnosticManager:
             # active view not changed
             return
 
-        self._active_view = view
-        self._show_report(view)
+        with self._change_lock:
+            self._active_view = view
+            self._show_report(view)
 
     def _show_report(self, view: sublime.View):
         if view != self._active_view:
             # cancel show report
             return
 
-        with self._change_lock:
-            diagnostic_items = self.items_map[view.file_name()]
+        diagnostic_items = self.items_map[view.file_name()]
         self.report_publisher.publish(self.PUBLISH_KEY, view, diagnostic_items)
 
 
