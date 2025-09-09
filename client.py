@@ -33,7 +33,12 @@ class ServerArguments:
 @lru_cache
 def normalize_method(method: Method) -> str:
     """normalize_method
-    e.g.: textDocument/completion -> textcocument_completion
+
+    Nomalization steps:
+    * replace '/' with '_'
+    * convert to lower case
+
+    e.g.: textDocument/completion -> textdocument_completion
     """
     return method.replace("/", "_").lower()
 
@@ -60,13 +65,23 @@ class BaseClient:
         self.session = Session(report_settings=report_settings)
 
     def _set_default_handler(self):
-        # Register all callable attribute starts with 'handle_' as default
-        # method handler.
-        # Method name must following rule:
-        #   * replace '/' with '_'
-        #   * method start with 'handle_'
-        #
-        # e.g: textDocument/completion -> textcocument_completion
+        """set default handler
+
+        Register class method which has following rule as method handler :
+        * method name start with 'handle_'
+        * replace '/' with '_'
+        * convert to lower case
+
+        example:
+          ---------------------------------------------------------
+          rpc method                 handler method name
+          ---------------------------------------------------------
+          textDocument/completion    handle_textdocument_completion
+          textDocument/hover         handle_textdocument_hover
+          textDocument/codeAction    handle_textdocument_codeaction
+          ---------------------------------------------------------
+
+        """
 
         for name in dir(self):
             attribute = getattr(self, name)
@@ -76,7 +91,7 @@ class BaseClient:
             prefix = "handle_"
             if name.startswith(prefix):
                 method = name[len(prefix) :]
-                self.handler_map[method.lower()] = attribute
+                self.handler_map[normalize_method(method)] = attribute
 
     def handle(self, method: Method, params: HandleParams) -> Optional[Any]:
         """"""
