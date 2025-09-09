@@ -155,7 +155,8 @@ class DiagnosticManager:
             # cancel show report
             return
 
-        diagnostic_items = self.items_map[view.file_name()]
+        with self._change_lock:
+            diagnostic_items = self.items_map[view.file_name()]
         self.report_publisher.publish(self.PUBLISH_KEY, view, diagnostic_items)
 
 
