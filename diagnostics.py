@@ -3,6 +3,7 @@
 import threading
 from collections import namedtuple, defaultdict
 from dataclasses import dataclass, asdict
+from itertools import chain
 from pathlib import Path
 from typing import Dict, List, Set, Callable
 
@@ -179,9 +180,8 @@ class SyntaxHighlighter:
         )
 
     def clear(self):
-        for window in sublime.windows():
-            for view in [v for v in window.views()]:
-                view.erase_regions(self._region_key)
+        for view in chain.from_iterable([w.views() for w in sublime.windows()]):
+            view.erase_regions(self._region_key)
 
 
 class StatusReporter:
@@ -194,9 +194,8 @@ class StatusReporter:
         view.set_status(self._status_key, f"Errors {err_count}, Warnings {warn_count}")
 
     def clear(self):
-        for window in sublime.windows():
-            for view in [v for v in window.views()]:
-                view.erase_status(self._status_key)
+        for view in chain.from_iterable([w.views() for w in sublime.windows()]):
+            view.erase_status(self._status_key)
 
 
 class OutputPanelReporter:
