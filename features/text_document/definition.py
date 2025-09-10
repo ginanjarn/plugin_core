@@ -73,16 +73,18 @@ class DocumentDefinitionMixins:
     definition_target = None
 
     @must_initialized
-    def textdocument_definition(self, view, row, col):
+    def textdocument_definition(self, view: sublime.View, row: int, col: int):
         if document := self.session.get_document(view):
             self.definition_target = document
-            self.message_pool.send_request(
-                "textDocument/definition",
+            self.request_textdocument_definition(
                 {
                     "position": {"character": col, "line": row},
                     "textDocument": {"uri": path_to_uri(document.file_name)},
                 },
             )
+
+    def request_textdocument_definition(self, params: dict):
+        self.message_pool.send_request("textDocument/definition", params)
 
     def handle_textdocument_definition(self, session: Session, response: Response):
         if error := response.error:

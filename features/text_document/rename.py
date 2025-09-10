@@ -77,16 +77,18 @@ class DocumentRenameMixins:
     rename_target = None
 
     @must_initialized
-    def textdocument_preparerename(self, view, row, col):
+    def textdocument_preparerename(self, view: sublime.View, row: int, col: int):
         if document := self.session.get_document(view):
             self.rename_target = document
-            self.message_pool.send_request(
-                "textDocument/prepareRename",
+            self.request_textdocument_preparerename(
                 {
                     "position": {"character": col, "line": row},
                     "textDocument": {"uri": path_to_uri(document.file_name)},
                 },
             )
+
+    def request_textdocument_preparerename(self, params: dict):
+        self.message_pool.send_request("textDocument/prepareRename", params)
 
     def handle_textdocument_preparerename(self, session: Session, response: Response):
         if error := response.error:
@@ -122,21 +124,25 @@ class DocumentRenameMixins:
         )
 
     @must_initialized
-    def textdocument_rename(self, view, row, col, new_name):
+    def textdocument_rename(
+        self, view: sublime.View, row: int, col: int, new_name: str
+    ):
         # Save all changes before perform rename
         for document in self.session.get_documents():
             document.view.run_command("save")
 
         if document := self.session.get_document(view):
             self.rename_target = document
-            self.message_pool.send_request(
-                "textDocument/rename",
+            self.request_textdocument_rename(
                 {
                     "newName": new_name,
-                    "position": {"character": col, "line": row},
+                    "position": {"line": row, "character": col},
                     "textDocument": {"uri": path_to_uri(document.file_name)},
-                },
+                }
             )
+
+    def request_textdocument_rename(self, params: dict):
+        self.message_pool.send_request("textDocument/rename", params)
 
     def handle_textdocument_rename(self, session: Session, response: Response):
         if error := response.error:

@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import List, Any
+from typing import List, Any, Optional
 import sublime
 import sublime_plugin
 
@@ -50,7 +50,12 @@ class DocumentCodeActionMixins:
     code_action_target = None
 
     @must_initialized
-    def textdocument_codeaction(self, view, region, action_kinds=None):
+    def textdocument_codeaction(
+        self,
+        view: sublime.View,
+        region: sublime.Region,
+        action_kinds: Optional[List[int]] = None,
+    ):
         if document := self.session.get_document(view):
             self.code_action_target = document
             start = view.rowcol(region.begin())
@@ -64,8 +69,7 @@ class DocumentCodeActionMixins:
             if action_kinds:
                 context["only"] = list(action_kinds)
 
-            self.message_pool.send_request(
-                "textDocument/codeAction",
+            self.request_textdocument_codeaction(
                 {
                     "textDocument": {"uri": path_to_uri(document.file_name)},
                     "range": {
@@ -75,6 +79,9 @@ class DocumentCodeActionMixins:
                     "context": context,
                 },
             )
+
+    def request_textdocument_codeaction(self, params: dict):
+        self.message_pool.send_request({"textDocument/codeAction", params})
 
     def handle_textdocument_codeaction(self, session: Session, response: Response):
         if err := response.error:
@@ -105,13 +112,16 @@ class CodeActionResolveMixins:
 
     @must_initialized
     def code_action_resolve(self, params: Any):
+        self.request_codeaction_resolve(params)
+
+    def request_codeaction_resolve(self, params: dict):
         self.message_pool.send_request("codeAction/resolve", params)
 
-    def handle_codeaction_resolve(self, session: Session, params: Response):
-        if err := params.error:
+    def handle_codeaction_resolve(self, session: Session, response: Response):
+        if err := response.error:
             print(err["message"])
 
-        elif result := params.result:
+        elif result := response.result:
             self._handle_action(session, result)
 
     def _handle_action(self, session: Session, action: dict) -> None:

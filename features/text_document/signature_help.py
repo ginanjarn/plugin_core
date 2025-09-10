@@ -80,16 +80,18 @@ class DocumentSignatureHelpMixins:
     signature_help_target = None
 
     @must_initialized
-    def textdocument_signaturehelp(self, view, row, col):
+    def textdocument_signaturehelp(self, view: sublime.View, row: int, col: int):
         if document := self.session.get_document(view):
             self.signature_help_target = document
-            self.message_pool.send_request(
-                "textDocument/signatureHelp",
+            self.request_textdocument_signaturehelp(
                 {
-                    "position": {"character": col, "line": row},
+                    "position": {"line": row, "character": col},
                     "textDocument": {"uri": path_to_uri(document.file_name)},
                 },
             )
+
+    def request_textdocument_signaturehelp(self, params: dict):
+        self.message_pool.send_request("textDocument/signatureHelp", params)
 
     def handle_textdocument_signaturehelp(self, session: Session, response: Response):
         if err := response.error:

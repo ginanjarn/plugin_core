@@ -128,16 +128,18 @@ class DocumentCompletionMixins:
     completion_target = None
 
     @must_initialized
-    def textdocument_completion(self, view, row, col):
+    def textdocument_completion(self, view: sublime.View, row: int, col: int):
         if document := self.session.get_document(view):
             self.completion_target = document
-            self.message_pool.send_request(
-                "textDocument/completion",
+            self.request_textdocument_completion(
                 {
                     "position": {"character": col, "line": row},
                     "textDocument": {"uri": path_to_uri(document.file_name)},
                 },
             )
+
+    def request_textdocument_completion(self, params: dict):
+        self.message_pool.send_request("textDocument/completion", params)
 
     def handle_textdocument_completion(self, session: Session, response: Response):
         if err := response.error:

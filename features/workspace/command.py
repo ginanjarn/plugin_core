@@ -33,7 +33,10 @@ def must_initialized(func):
 class WorkspaceExecuteCommandMixins:
 
     def workspace_executecommand(self, commands: dict):
-        self.message_pool.send_request("workspace/executeCommand", commands)
+        self.request_workspace_executecommand(commands)
+
+    def request_workspace_executecommand(self, params: dict):
+        self.message_pool.send_request("workspace/executeCommand", params)
 
     def handle_workspace_executecommand(
         self, session: Session, response: Response

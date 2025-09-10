@@ -59,7 +59,7 @@ class DocumentHoverMixins:
     hover_target = None
 
     @must_initialized
-    def textdocument_hover(self, view, row, col):
+    def textdocument_hover(self, view: sublime.View, row: int, col: int):
         # method = "textDocument/hover"
         # In multi row/column layout, new popup will created in current View,
         # but active popup doesn't discarded.
@@ -72,13 +72,15 @@ class DocumentHoverMixins:
                 return
 
             self.hover_target = document
-            self.message_pool.send_request(
-                "textDocument/hover",
+            self.request_textdocument_hover(
                 {
                     "position": {"character": col, "line": row},
                     "textDocument": {"uri": path_to_uri(document.file_name)},
-                },
+                }
             )
+
+    def request_textdocument_hover(self, params: dict):
+        self.message_pool.send_request("textDocument/hover", params)
 
     def handle_textdocument_hover(self, session: Session, response: Response):
         if err := response.error:

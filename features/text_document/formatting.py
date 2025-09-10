@@ -52,16 +52,15 @@ class DocumentFormattingMixins:
     formatting_target = None
 
     @must_initialized
-    def textdocument_formatting(self, view):
+    def textdocument_formatting(self, view: sublime.View):
         if document := self.session.get_document(view):
             self.formatting_target = document
-            self.message_pool.send_request(
-                "textDocument/formatting",
-                {
-                    "options": {"insertSpaces": True, "tabSize": 2},
-                    "textDocument": {"uri": path_to_uri(document.file_name)},
-                },
+            self.request_textdocument_formatting(
+                {"textDocument": {"uri": path_to_uri(document.file_name)}}
             )
+
+    def request_textdocument_formatting(self, params: dict):
+        self.message_pool.send_request("textDocument/formatting", params)
 
     def handle_textdocument_formatting(self, session: Session, response: Response):
         if error := response.error:
