@@ -7,6 +7,7 @@ from ...document import is_valid_document
 from ...message import Response
 from ...session import Session
 from ...uri import path_to_uri
+from ..workspace.edit import WorkspaceEdit
 
 
 def client_must_ready(func):
@@ -105,13 +106,16 @@ class DocumentCodeActionMixins:
         )
 
     def _handle_selected_action(self, session: Session, action: dict) -> None:
-        raise NotImplementedError
+        if edit := action.get("edit"):
+            WorkspaceEdit(session).apply_changes(edit)
+        if command := action.get("command"):
+            self.workspace_executecommand(command)
 
 
 class CodeActionResolveMixins:
 
     @must_initialized
-    def code_action_resolve(self, params: Any):
+    def codeaction_resolve(self, params: Any):
         self.request_codeaction_resolve(params)
 
     def request_codeaction_resolve(self, params: dict):
@@ -125,4 +129,7 @@ class CodeActionResolveMixins:
             self._handle_action(session, result)
 
     def _handle_action(self, session: Session, action: dict) -> None:
-        raise NotImplementedError
+        if edit := action.get("edit"):
+            WorkspaceEdit(session).apply_changes(edit)
+        if command := action.get("command"):
+            self.workspace_executecommand(command)
