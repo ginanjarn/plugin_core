@@ -29,13 +29,14 @@ class _PrepareRenameCommand(sublime_plugin.TextCommand):
     def run(self, edit: sublime.Edit, event: Optional[dict] = None):
         if not is_valid_document(self.view):
             return
-        if event:
+
+        try:
             point = event["text_point"]
-        else:
+        except (AttributeError, KeyError):
             point = self.view.sel()[0].begin()
 
-        start_row, start_col = self.view.rowcol(point)
-        self.client.textdocument_preparerename(self.view, start_row, start_col)
+        row, col = self.view.rowcol(point)
+        self.client.textdocument_preparerename(self.view, row, col)
 
     def is_visible(self):
         return is_valid_document(self.view)

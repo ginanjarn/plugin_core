@@ -24,24 +24,16 @@ class _GotoDefinitionCommand(sublime_plugin.TextCommand):
     client = None
 
     @client_must_ready
-    def run(
-        self,
-        edit: sublime.Edit,
-        row: int = -1,
-        column: int = -1,
-        event: Optional[dict] = None,
-    ):
+    def run(self, edit: sublime.Edit, event: Optional[dict] = None):
         if not is_valid_document(self.view):
             return
 
-        if event:
+        try:
             point = event["text_point"]
-        else:
+        except (AttributeError, KeyError):
             point = self.view.sel()[0].begin()
 
-        if row < 0:
-            row, column = self.view.rowcol(point)
-
+        row, column = self.view.rowcol(point)
         self.client.textdocument_definition(self.view, row, column)
 
     def is_visible(self):

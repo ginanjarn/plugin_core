@@ -24,21 +24,12 @@ class _DocumentSignatureHelpCommand(sublime_plugin.TextCommand):
     client = None
 
     @client_must_ready
-    def run(
-        self,
-        edit: sublime.Edit,
-        row: int = -1,
-        column: int = -1,
-    ):
+    def run(self, edit: sublime.Edit):
         if not is_valid_document(self.view):
             return
 
-        if row < 0:
-            point = self.view.sel()[0].begin()
-            row, column = self.view.rowcol(point)
-        else:
-            point = self.view.text_point(row, column)
-
+        point = self.view.sel()[0].begin()
+        row, column = self.view.rowcol(point)
         if not self.view.match_selector(point, "meta.function-call.arguments"):
             return
 
