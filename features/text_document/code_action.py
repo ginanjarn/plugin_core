@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import List, Any, Optional
+from typing import List, Any, Optional, Iterator
 import sublime
 import sublime_plugin
 
@@ -82,7 +82,7 @@ class DocumentCodeActionMixins:
             )
 
     def request_textdocument_codeaction(self, params: dict):
-        self.message_pool.send_request({"textDocument/codeAction", params})
+        self.message_pool.send_request("textDocument/codeAction", params)
 
     def handle_textdocument_codeaction(self, session: Session, response: Response):
         if err := response.error:
@@ -107,9 +107,14 @@ class DocumentCodeActionMixins:
 
     def _handle_selected_action(self, session: Session, action: dict) -> None:
         if edit := action.get("edit"):
-            Workspace(session).apply_document_changes(edit)
+            changes = self._get_document_changes(edit)
+            Workspace(session).apply_document_changes(changes)
         if command := action.get("command"):
             self.workspace_executecommand(command)
+
+    def _get_document_changes(self, workspace_edit: dict) -> Iterator[dict]:
+        for changes in workspace_edit["documentChanges"]:
+            yield changes
 
 
 class CodeActionResolveMixins:
@@ -130,6 +135,11 @@ class CodeActionResolveMixins:
 
     def _handle_action(self, session: Session, action: dict) -> None:
         if edit := action.get("edit"):
-            Workspace(session).apply_document_changes(edit)
+            changes = self._get_document_changes(edit)
+            Workspace(session).apply_document_changes(changes)
         if command := action.get("command"):
             self.workspace_executecommand(command)
+
+    def _get_document_changes(self, workspace_edit: dict) -> Iterator[dict]:
+        for changes in workspace_edit["documentChanges"]:
+            yield changes
