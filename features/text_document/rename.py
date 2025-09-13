@@ -4,11 +4,11 @@ from typing import Optional, Iterator
 import sublime
 import sublime_plugin
 
-from ..workspace.edit import WorkspaceEdit
 from ...document import is_valid_document
 from ...message import Response
 from ...session import Session
 from ...uri import path_to_uri
+from ...features.document_updater import Workspace
 from ....constant import COMMAND_PREFIX
 
 
@@ -149,9 +149,9 @@ class DocumentRenameMixins:
         if error := response.error:
             print(error["message"])
         elif result := response.result:
-            changes = self._get_changes(result)
-            WorkspaceEdit(session).apply_changes(changes)
+            changes = self._get_document_changes(result)
+            Workspace(session).apply_document_changes(changes)
 
-    def _get_changes(self, edit: dict) -> Iterator[dict]:
-        for document_changes in edit["documentChanges"]:
-            yield document_changes
+    def _get_document_changes(self, workspace_edit: dict) -> Iterator[dict]:
+        for changes in workspace_edit["documentChanges"]:
+            yield changes

@@ -7,7 +7,7 @@ from ...document import is_valid_document
 from ...message import Response
 from ...session import Session
 from ...uri import path_to_uri
-from ..workspace.edit import WorkspaceEdit
+from ...features.document_updater import Workspace
 
 
 def client_must_ready(func):
@@ -107,7 +107,7 @@ class DocumentCodeActionMixins:
 
     def _handle_selected_action(self, session: Session, action: dict) -> None:
         if edit := action.get("edit"):
-            WorkspaceEdit(session).apply_changes(edit)
+            Workspace(session).apply_document_changes(edit)
         if command := action.get("command"):
             self.workspace_executecommand(command)
 
@@ -130,6 +130,6 @@ class CodeActionResolveMixins:
 
     def _handle_action(self, session: Session, action: dict) -> None:
         if edit := action.get("edit"):
-            WorkspaceEdit(session).apply_changes(edit)
+            Workspace(session).apply_document_changes(edit)
         if command := action.get("command"):
             self.workspace_executecommand(command)
