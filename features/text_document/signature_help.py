@@ -3,7 +3,7 @@ from functools import wraps
 import sublime
 import sublime_plugin
 
-from ....constant import COMMAND_PREFIX
+from ....constant import COMMAND_PREFIX, LANGUAGE_ID
 from ...document import is_valid_document
 from ...message import Response
 from ...session import Session
@@ -95,7 +95,7 @@ class DocumentSignatureHelpMixins:
 
             message = "".join(
                 [
-                    "```python\n",
+                    f"```{LANGUAGE_ID}\n",
                     "\n".join([s["label"] for s in signatures]),
                     "\n```",
                 ]
