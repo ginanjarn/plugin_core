@@ -98,7 +98,7 @@ class BaseClient:
         try:
             func = self.handler_map[normalize_method(method)]
         except KeyError:
-            raise MethodNotFound(Method)
+            raise MethodNotFound
 
         return func(self.session, params)
 
