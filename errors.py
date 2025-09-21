@@ -59,7 +59,7 @@ class ServerError(JSONRPCException):
 
 
 def transform_error(
-    error: Union[JSONRPCException, Exception, None]
+    error: Union[JSONRPCException, Exception, None],
 ) -> Optional[Dict[str, Any]]:
     """transform exception to rpc error"""
 

@@ -134,7 +134,7 @@ class ChildProcess:
         if not self.process:
             return
 
-        self.process.kill()
+        self.process.terminate()
         return_code = self.process.wait()
         print("process terminated with exit code", return_code)
         # Set to None to release 'Popen()' object from memory

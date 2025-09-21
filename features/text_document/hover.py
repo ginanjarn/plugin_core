@@ -5,7 +5,7 @@ from html import escape as escape_html
 import sublime
 import sublime_plugin
 
-from ...document import is_valid_document
+from ...document import Document, is_valid_document
 from ...message import Response
 from ...session import Session
 from ...uri import path_to_uri
@@ -67,7 +67,7 @@ class DocumentHoverMixins:
             other.view.hide_popup()
 
         if document := self.session.get_document(view):
-            if message := self._get_diagnostic_message(view, row, col):
+            if message := self._get_diagnostic_message(document, row, col):
                 self.show_popup(view, message, row, col)
                 return
 
@@ -110,14 +110,17 @@ class DocumentHoverMixins:
             },
         )
 
-    def _get_diagnostic_message(self, view: sublime.View, row: int, col: int):
-        point = view.text_point(row, col)
-
-        diagnostics = self.session.diagnostic_manager.get(view)
-        items = [i for i in diagnostics if i.region.contains(point)]
+    def _get_diagnostic_message(self, document: Document, row: int, col: int):
+        items = [
+            d["message"]
+            for d in document.diagnostics
+            if LineCharacter(**d["range"]["start"])
+            <= LineCharacter(row, col)
+            <= LineCharacter(**d["range"]["end"])
+        ]
         if not items:
             return ""
 
         title = "### Diagnostics:\n"
-        diagnostic_message = "\n".join([f"- {escape_html(d.message)}" for d in items])
+        diagnostic_message = "\n".join([f"- {escape_html(d)}" for d in items])
         return f"{title}\n{diagnostic_message}"

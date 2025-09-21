@@ -8,5 +8,7 @@ class DocumentDiagnosticsMixins:
         file_name = uri_to_path(params["uri"])
         diagnostics = params["diagnostics"]
 
-        for document in session.get_documents(lambda doc: doc.file_name == file_name):
-            session.diagnostic_manager.add(document.view, diagnostics)
+        documents = session.get_documents(lambda doc: doc.file_name == file_name)
+        for document in documents:
+            document.diagnostics = diagnostics
+            session.diagnostic_manager.update(document.view, diagnostics)

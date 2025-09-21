@@ -35,6 +35,7 @@ class Document:
         self.view = view
         self.file_name = self.view.file_name()
         self.language_id = LANGUAGE_ID
+        self.diagnostics: List[dict] = []
 
         self._cached_completion = None
         self._cached_completion_lock = threading.Lock()

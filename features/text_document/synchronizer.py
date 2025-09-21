@@ -178,7 +178,6 @@ class DocumentSynchronizerMixins:
                 {"textDocument": {"uri": path_to_uri(document.file_name)}},
             )
 
-        self.session.diagnostic_manager.remove(view)
         self.session.remove_document(view)
 
     @must_initialized

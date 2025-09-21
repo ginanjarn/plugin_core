@@ -46,7 +46,7 @@ class InitializerMixins:
                         },
                         "hover": {
                             "contentFormat": ["markdown", "plaintext"],
-                        }
+                        },
                     }
                 },
             },

@@ -61,10 +61,9 @@ class DocumentCodeActionMixins:
             self.code_action_target = document
             start = view.rowcol(region.begin())
             end = view.rowcol(region.end())
-            diagnostis = self.session.diagnostic_manager.get_raw(view)
 
             context = {
-                "diagnostics": diagnostis,
+                "diagnostics": document.diagnostics,
                 "triggerKind": 2,
             }
             if action_kinds:
