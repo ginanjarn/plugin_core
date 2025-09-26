@@ -11,8 +11,8 @@ from typing import List, Tuple, Optional, Union, Callable, Any
 
 if os.name == "nt":
     STARTUPINFO = subprocess.STARTUPINFO()
-    # Hide created process window
-    STARTUPINFO.dwFlags |= subprocess.SW_HIDE | subprocess.STARTF_USESHOWWINDOW
+    STARTUPINFO.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    STARTUPINFO.wShowWindow = subprocess.SW_HIDE
 else:
     STARTUPINFO = None
 
