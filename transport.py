@@ -1,6 +1,5 @@
 """transport handler"""
 
-import re
 from abc import ABC, abstractmethod
 from io import BytesIO
 
@@ -34,9 +33,6 @@ def wrap_rpc(content: bytes) -> bytes:
     return b"%s%s%s" % (header, separator, content)
 
 
-CONTENT_LENGTH_REGEX = re.compile(rb"Content-Length: (\d+)")
-
-
 def get_content_length(header: bytes) -> int:
     """get content length from header
 
@@ -45,9 +41,12 @@ def get_content_length(header: bytes) -> int:
     Raises:
         ValueError if content length not found
     """
-    for line in header.splitlines():
-        if match := CONTENT_LENGTH_REGEX.match(line):
-            return int(match.group(1))
+    field_text = b"Content-Length: "
+    field_end = 16  # => len(field_text)
+
+    for line in header.splitlines(keepends=False):
+        if line[:field_end] == field_text:
+            return int(line[field_end:])
 
     raise ValueError("unable get 'Content-Length'")
 
