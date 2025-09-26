@@ -163,9 +163,11 @@ class MessageManager:
         self,
         transport: Transport,
         handle_func: MessageHandler,
+        terminate_callback: Callable[[], None],
     ):
         self.transport = transport
         self.handle_func = handle_func
+        self.terminate_callback = terminate_callback
         self._request_manager = RequestManager()
 
     def _reset_managers(self) -> None:
@@ -268,13 +270,15 @@ class MessagePool(CommandInterfaceMixins, ReceivedMessageHandlerMixins):
             except EOFError:
                 # stdout closed
                 break
-
             except Exception as err:
-                LOGGER.exception(err, exc_info=True)
-                self.transport.close()
+                LOGGER.error(err, exc_info=True)
                 break
 
             try:
                 self.handle_message(message)
             except Exception:
-                LOGGER.exception("error handle message: %r", message, exc_info=True)
+                LOGGER.error("error handle message: %r", message, exc_info=True)
+                break
+
+        # terminated
+        self.terminate_callback()

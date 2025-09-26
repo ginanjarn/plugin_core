@@ -53,7 +53,11 @@ class BaseClient:
         report_settings: ReportSettings = None,
     ):
         self.server = ChildProcess(arguments.command, arguments.cwd)
-        self.message_pool = MessagePool(transport_cls(self.server), self.handle)
+        self.message_pool = MessagePool(
+            transport_cls(self.server),
+            self.handle,
+            self.terminate,
+        )
 
         # server message handler
         self.handler_map: Dict[Method, HandleSessionFunction] = dict()
