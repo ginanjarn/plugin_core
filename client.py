@@ -19,9 +19,10 @@ from .message import (
 from .session import Session
 from .transport import Transport
 
-
-HandleParams = Union[Params, Response]
-HandleSessionFunction = Callable[[Session, HandleParams], Any]
+RequestHandler = Callable[[Session, Params], Any]
+NotificationHandler = Callable[[Session, Params], None]
+ResponseHandler = Callable[[Session, Response], None]
+SessionMessageHandler = Union[RequestHandler, NotificationHandler, ResponseHandler]
 
 
 @dataclass
@@ -60,7 +61,7 @@ class BaseClient:
         )
 
         # server message handler
-        self.handler_map: Dict[Method, HandleSessionFunction] = dict()
+        self.handler_map: Dict[Method, SessionMessageHandler] = dict()
         self._start_server_lock = threading.Lock()
 
         self._set_default_handler()
@@ -97,7 +98,7 @@ class BaseClient:
                 method = name[len(prefix) :]
                 self.handler_map[normalize_method(method)] = attribute
 
-    def handle(self, method: Method, params: HandleParams) -> Optional[Any]:
+    def handle(self, method: Method, params: Union[Params, Response]) -> Optional[Any]:
         """"""
         try:
             func = self.handler_map[normalize_method(method)]
@@ -106,7 +107,7 @@ class BaseClient:
 
         return func(self.session, params)
 
-    def register_handler(self, method: Method, function: HandleSessionFunction) -> None:
+    def register_handler(self, method: Method, function: SessionMessageHandler) -> None:
         """"""
         self.handler_map[normalize_method(method)] = function
 

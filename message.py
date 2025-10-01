@@ -162,11 +162,11 @@ class MessageManager:
     def __init__(
         self,
         transport: Transport,
-        handle_func: MessageHandler,
+        message_handler: MessageHandler,
         terminate_callback: Callable[[], None],
     ):
         self.transport = transport
-        self.handle_func = handle_func
+        self.handle_message_fn = message_handler
         self.terminate_callback = terminate_callback
         self._request_manager = RequestManager()
 
@@ -190,8 +190,8 @@ class MessageManager:
         raise NotImplementedError
 
 
-class CommandInterfaceMixins(MessageManager):
-    """Command interface to control server"""
+class CommandMixins(MessageManager):
+    """Command interface to send message to server"""
 
     def send_request(self, method: Method, params: Params) -> None:
         # cancel previous request with same method
@@ -201,15 +201,15 @@ class CommandInterfaceMixins(MessageManager):
         req_id = self._request_manager.add(method)
         self.send_message(Request(req_id, method, params))
 
-    def _handle_response(self, message: Response) -> None:
+    def _handle_response(self, response: Response) -> None:
         try:
-            method = self._request_manager.pop(message.id)
+            method = self._request_manager.pop(response.id)
         except KeyError:
             # ignore canceled response
             return
 
         try:
-            self.handle_func(method, message)
+            self.handle_message_fn(method, response)
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
 
@@ -223,33 +223,33 @@ class CommandInterfaceMixins(MessageManager):
         self.send_message(Notification(method, params))
 
 
-class ReceivedMessageHandlerMixins(MessageManager):
+class MessageHandlerMixins(MessageManager):
     """Handle message received from server"""
 
-    def _handle_request(self, message: Request) -> None:
+    def _handle_request(self, request: Request) -> None:
         result = None
         error = None
         try:
-            result = self.handle_func(message.method, message.params)
+            result = self.handle_message_fn(request.method, request.params)
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
             error = transform_error(err)
 
-        self._send_response(message.id, result, error)
+        self._send_response(request.id, result, error)
 
     def _send_response(
         self, id: int, result: Optional[Any] = None, error: Optional[dict] = None
     ) -> None:
         self.send_message(Response(id, result, error))
 
-    def _handle_notification(self, message: Notification) -> None:
+    def _handle_notification(self, notification: Notification) -> None:
         try:
-            self.handle_func(message.method, message.params)
+            self.handle_message_fn(notification.method, notification.params)
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
 
 
-class MessagePool(CommandInterfaceMixins, ReceivedMessageHandlerMixins):
+class MessagePool(CommandMixins, MessageHandlerMixins):
     """Client - Server Message Pool"""
 
     def handle_message(self, message: Message) -> None:
