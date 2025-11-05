@@ -91,7 +91,6 @@ class ChildProcess:
             stderr=subprocess.PIPE,
             env=env or None,
             cwd=self.cwd or None,
-            shell=True,
             bufsize=0,
             startupinfo=STARTUPINFO,
         )
