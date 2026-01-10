@@ -190,8 +190,8 @@ class MessageManager:
         raise NotImplementedError
 
 
-class CommandMixins(MessageManager):
-    """Command interface to send message to server"""
+class ClientCommand(MessageManager):
+    """Client command interface"""
 
     def send_request(self, method: Method, params: Params) -> None:
         # cancel previous request with same method
@@ -223,8 +223,8 @@ class CommandMixins(MessageManager):
         self.send_message(Notification(method, params))
 
 
-class MessageHandlerMixins(MessageManager):
-    """Handle message received from server"""
+class ServerCommand(MessageManager):
+    """Server command interface"""
 
     def _handle_request(self, request: Request) -> None:
         result = None
@@ -249,7 +249,7 @@ class MessageHandlerMixins(MessageManager):
             LOGGER.exception(err, exc_info=True)
 
 
-class MessagePool(CommandMixins, MessageHandlerMixins):
+class MessagePool(ClientCommand, ServerCommand):
     """Client - Server Message Pool"""
 
     def handle_message(self, message: Message) -> None:
