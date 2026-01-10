@@ -44,7 +44,39 @@ def normalize_method(method: Method) -> str:
     return method.replace("/", "_").lower()
 
 
-class BaseClient:
+class ServerProcessManager:
+
+    _start_server_lock = threading.Lock()
+
+    def __init__(self, *args, **kwargs) -> None:
+        self.server_process: ChildProcess
+
+    def start_server(self, env: Optional[dict] = None) -> None:
+        """"""
+        # only one thread can run server
+        if self._start_server_lock.locked():
+            return
+
+        with self._start_server_lock:
+            if not self.server_process.is_running():
+                sublime.status_message("running language server...")
+                # sometimes the server stop working
+                # we must reset the state before run server
+                self.reset_session()
+
+                self.server_process.run(env)
+                self.message_pool.listen()
+
+    def terminate(self) -> None:
+        """terminate session"""
+        self.server_process.terminate()
+        self.reset_session()
+
+    def reset_session(self) -> None:
+        pass
+
+
+class BaseClient(ServerProcessManager):
     """"""
 
     def __init__(
@@ -54,16 +86,11 @@ class BaseClient:
         report_settings: ReportSettings = None,
     ):
         self.server_process = ChildProcess(arguments.command, arguments.cwd)
-        self.message_pool = MessagePool(
-            transport_cls(self.server_process),
-            self.handle,
-            self.terminate,
-        )
+        transport = transport_cls(self.server_process)
 
+        self.message_pool = MessagePool(transport, self.handle, self.terminate)
         # server message handler
         self.handler_map: Dict[Method, SessionMessageHandler] = dict()
-        self._start_server_lock = threading.Lock()
-
         self._set_default_handler()
 
         # session data
@@ -111,22 +138,6 @@ class BaseClient:
         """"""
         self.handler_map[normalize_method(method)] = function
 
-    def start_server(self, env: Optional[dict] = None) -> None:
-        """"""
-        # only one thread can run server
-        if self._start_server_lock.locked():
-            return
-
-        with self._start_server_lock:
-            if not self.server_process.is_running():
-                sublime.status_message("running language server...")
-                # sometimes the server stop working
-                # we must reset the state before run server
-                self.reset_session()
-
-                self.server_process.run(env)
-                self.message_pool.listen()
-
     def reset_session(self) -> None:
         """reset session state"""
         self.session.reset()
@@ -134,8 +145,3 @@ class BaseClient:
     def is_ready(self) -> bool:
         """check session is ready"""
         return self.server_process.is_running() and self.session.is_initialized()
-
-    def terminate(self) -> None:
-        """terminate session"""
-        self.server_process.terminate()
-        self.reset_session()
