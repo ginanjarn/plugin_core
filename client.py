@@ -53,9 +53,9 @@ class BaseClient:
         transport_cls: Transport,
         report_settings: ReportSettings = None,
     ):
-        self.server = ChildProcess(arguments.command, arguments.cwd)
+        self.server_process = ChildProcess(arguments.command, arguments.cwd)
         self.message_pool = MessagePool(
-            transport_cls(self.server),
+            transport_cls(self.server_process),
             self.handle,
             self.terminate,
         )
@@ -118,13 +118,13 @@ class BaseClient:
             return
 
         with self._start_server_lock:
-            if not self.server.is_running():
+            if not self.server_process.is_running():
                 sublime.status_message("running language server...")
                 # sometimes the server stop working
                 # we must reset the state before run server
                 self.reset_session()
 
-                self.server.run(env)
+                self.server_process.run(env)
                 self.message_pool.listen()
 
     def reset_session(self) -> None:
@@ -133,9 +133,9 @@ class BaseClient:
 
     def is_ready(self) -> bool:
         """check session is ready"""
-        return self.server.is_running() and self.session.is_initialized()
+        return self.server_process.is_running() and self.session.is_initialized()
 
     def terminate(self) -> None:
         """terminate session"""
-        self.server.terminate()
+        self.server_process.terminate()
         self.reset_session()
