@@ -5,7 +5,7 @@ import sublime
 import sublime_plugin
 
 from ...document import is_valid_document
-from ...message import Response
+from ...message import Result
 from ...session import Session
 from ...uri import path_to_uri
 
@@ -139,18 +139,16 @@ class DocumentCompletionMixins:
             )
 
     def request_textdocument_completion(self, params: dict):
-        self.message_pool.send_request("textDocument/completion", params)
+        self.send_request("textDocument/completion", params)
 
-    def handle_textdocument_completion(self, session: Session, response: Response):
-        if err := response.error:
-            print(err["message"])
+    def handle_textdocument_completion(self, session: Session, result: Result):
+        if not result:
+            return
+        items = [self._build_completion(item) for item in result["items"]]
+        self.completion_target.set_completion(items)
 
-        elif result := response.result:
-            items = [self._build_completion(item) for item in result["items"]]
-            self.completion_target.set_completion(items)
-
-            view = self.completion_target.view
-            view.run_command("auto_complete", self.AUTO_COMPLETE_ARGUMENTS)
+        view = self.completion_target.view
+        view.run_command("auto_complete", self.AUTO_COMPLETE_ARGUMENTS)
 
     @staticmethod
     def _build_completion(completion_item: dict) -> sublime.CompletionItem:

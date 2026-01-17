@@ -6,7 +6,7 @@ import sublime
 import sublime_plugin
 
 from ...document import Document, is_valid_document
-from ...message import Response
+from ...message import Result
 from ...session import Session
 from ...uri import path_to_uri
 
@@ -80,16 +80,14 @@ class DocumentHoverMixins:
             )
 
     def request_textdocument_hover(self, params: dict):
-        self.message_pool.send_request("textDocument/hover", params)
+        self.send_request("textDocument/hover", params)
 
-    def handle_textdocument_hover(self, session: Session, response: Response):
-        if err := response.error:
-            print(err["message"])
-
-        elif result := response.result:
-            message = result["contents"]["value"]
-            row, col = LineCharacter(**result["range"]["start"])
-            self.show_popup(self.hover_target.view, message, row, col)
+    def handle_textdocument_hover(self, session: Session, result: Result):
+        if not result:
+            return
+        message = result["contents"]["value"]
+        row, col = LineCharacter(**result["range"]["start"])
+        self.show_popup(self.hover_target.view, message, row, col)
 
     @staticmethod
     def show_popup(

@@ -5,7 +5,7 @@ import sublime
 import sublime_plugin
 
 from ...document import is_valid_document
-from ...message import Response
+from ...message import Result
 from ...session import Session
 from ...uri import path_to_uri, uri_to_path
 
@@ -76,15 +76,14 @@ class DocumentDefinitionMixins:
             )
 
     def request_textdocument_definition(self, params: dict):
-        self.message_pool.send_request("textDocument/definition", params)
+        self.send_request("textDocument/definition", params)
 
-    def handle_textdocument_definition(self, session: Session, response: Response):
-        if error := response.error:
-            print(error["message"])
-        elif result := response.result:
-            view = self.definition_target.view
-            locations = [self._build_location(l) for l in result]
-            open_location(view, locations)
+    def handle_textdocument_definition(self, session: Session, result: Result):
+        if not result:
+            return
+        view = self.definition_target.view
+        locations = [self._build_location(l) for l in result]
+        open_location(view, locations)
 
     @staticmethod
     def _build_location(location: dict) -> PathEncodedStr:

@@ -7,7 +7,7 @@ import sublime_plugin
 
 from ....constant import COMMAND_PREFIX
 from ...document import is_valid_document, TextChange
-from ...message import Response
+from ...message import Result
 from ...session import Session
 from ...uri import path_to_uri
 
@@ -60,14 +60,13 @@ class DocumentFormattingMixins:
             )
 
     def request_textdocument_formatting(self, params: dict):
-        self.message_pool.send_request("textDocument/formatting", params)
+        self.send_request("textDocument/formatting", params)
 
-    def handle_textdocument_formatting(self, session: Session, response: Response):
-        if error := response.error:
-            print(error["message"])
-        elif result := response.result:
-            changes = [rpc_to_textchange(c) for c in result]
-            self.apply_view_changes(self.formatting_target.view, changes)
+    def handle_textdocument_formatting(self, session: Session, result: Result):
+        if not result:
+            return
+        changes = [rpc_to_textchange(c) for c in result]
+        self.apply_view_changes(self.formatting_target.view, changes)
 
     @staticmethod
     def apply_view_changes(view: sublime.View, text_changes: List[TextChange]):

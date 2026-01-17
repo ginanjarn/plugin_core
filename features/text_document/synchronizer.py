@@ -133,7 +133,7 @@ class DocumentSynchronizerMixins:
         other = self.session.get_document_with_name(view.file_name())
         if not other:
             # Notify server to open document
-            self.message_pool.send_notification(
+            self.send_notification(
                 "textDocument/didOpen",
                 {
                     "textDocument": {
@@ -151,7 +151,7 @@ class DocumentSynchronizerMixins:
     @must_initialized
     def textdocument_didsave(self, view: sublime.View):
         if document := self.session.get_document(view):
-            self.message_pool.send_notification(
+            self.send_notification(
                 "textDocument/didSave",
                 {"textDocument": {"uri": path_to_uri(document.file_name)}},
             )
@@ -173,7 +173,7 @@ class DocumentSynchronizerMixins:
             return
 
         if document := self.session.get_document(view):
-            self.message_pool.send_notification(
+            self.send_notification(
                 "textDocument/didClose",
                 {"textDocument": {"uri": path_to_uri(document.file_name)}},
             )
@@ -183,7 +183,7 @@ class DocumentSynchronizerMixins:
     @must_initialized
     def textdocument_didchange(self, view: sublime.View, changes: List[TextChange]):
         if document := self.session.get_document(view):
-            self.message_pool.send_notification(
+            self.send_notification(
                 "textDocument/didChange",
                 {
                     "contentChanges": [textchange_to_rpc(c) for c in changes],

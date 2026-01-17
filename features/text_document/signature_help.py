@@ -5,7 +5,7 @@ import sublime_plugin
 
 from ....constant import COMMAND_PREFIX, LANGUAGE_ID
 from ...document import is_valid_document
-from ...message import Response
+from ...message import Result
 from ...session import Session
 from ...uri import path_to_uri
 
@@ -82,27 +82,25 @@ class DocumentSignatureHelpMixins:
             )
 
     def request_textdocument_signaturehelp(self, params: dict):
-        self.message_pool.send_request("textDocument/signatureHelp", params)
+        self.send_request("textDocument/signatureHelp", params)
 
-    def handle_textdocument_signaturehelp(self, session: Session, response: Response):
-        if err := response.error:
-            print(err["message"])
+    def handle_textdocument_signaturehelp(self, session: Session, result: Result):
+        if not result:
+            return
+        signatures = result["signatures"]
+        if not signatures:
+            return
 
-        elif result := response.result:
-            signatures = result["signatures"]
-            if not signatures:
-                return
-
-            message = "".join(
-                [
-                    f"```{LANGUAGE_ID}\n",
-                    "\n".join([s["label"] for s in signatures]),
-                    "\n```",
-                ]
-            )
-            view = self.signature_help_target.view
-            row, col = view.rowcol(view.sel()[0].a)
-            self.show_popup(view, message, row, col)
+        message = "".join(
+            [
+                f"```{LANGUAGE_ID}\n",
+                "\n".join([s["label"] for s in signatures]),
+                "\n```",
+            ]
+        )
+        view = self.signature_help_target.view
+        row, col = view.rowcol(view.sel()[0].a)
+        self.show_popup(view, message, row, col)
 
     @staticmethod
     def show_popup(

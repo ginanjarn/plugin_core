@@ -1,7 +1,7 @@
 from functools import wraps
 from typing import Any, Iterator
 
-from ...message import Response
+from ...message import Result
 from ...session import Session
 from ...features.document_updater import Workspace
 
@@ -25,14 +25,12 @@ class CodeActionResolveMixins:
         self.request_codeaction_resolve(params)
 
     def request_codeaction_resolve(self, params: dict):
-        self.message_pool.send_request("codeAction/resolve", params)
+        self.send_request("codeAction/resolve", params)
 
-    def handle_codeaction_resolve(self, session: Session, response: Response):
-        if err := response.error:
-            print(err["message"])
-
-        elif result := response.result:
-            self._handle_action(session, result)
+    def handle_codeaction_resolve(self, session: Session, result: Result):
+        if not result:
+            return
+        self._handle_action(session, result)
 
     def _handle_action(self, session: Session, action: dict) -> None:
         if edit := action.get("edit"):

@@ -1,23 +1,32 @@
 """client object"""
 
+import logging
 import threading
-from dataclasses import dataclass
+import sys
 from functools import lru_cache
-from pathlib import Path
-from typing import Optional, Dict, List, Callable, Any, Union
+from typing import Optional, Dict, Callable, Any, Union
 import sublime
 
 from .child_process import ChildProcess
 from .diagnostics import ReportSettings
-from .errors import MethodNotFound
+from .errors import MethodNotFound, transform_error
 from .message import (
-    MessagePool,
+    Message,
+    Request,
+    Notification,
     Method,
-    Response,
     Params,
+    Response,
+    Result,
+    loads,
+    dumps,
 )
 from .session import Session
 from .transport import Transport
+from ..constant import LOGGING_CHANNEL
+
+LOGGER = logging.getLogger(LOGGING_CHANNEL)
+
 
 RequestHandler = Callable[[Session, Params], Any]
 NotificationHandler = Callable[[Session, Params], None]
@@ -25,14 +34,8 @@ ResponseHandler = Callable[[Session, Response], None]
 SessionMessageHandler = Union[RequestHandler, NotificationHandler, ResponseHandler]
 
 
-@dataclass
-class ServerArguments:
-    command: List[str]
-    cwd: Path
-
-
 @lru_cache
-def normalize_method(method: Method) -> str:
+def normalize_method(method: Method) -> Method:
     """normalize_method
 
     Nomalization steps:
@@ -44,7 +47,7 @@ def normalize_method(method: Method) -> str:
     return method.replace("/", "_").lower()
 
 
-class ServerProcessManager:
+class ServerProcessManagerMixin:
 
     _start_server_lock = threading.Lock()
 
@@ -65,34 +68,230 @@ class ServerProcessManager:
                 self.reset_session()
 
                 self.server_process.run(env)
-                self.message_pool.listen()
+                self.listen()
 
     def terminate(self) -> None:
         """terminate session"""
         self.server_process.terminate()
         self.reset_session()
 
-    def reset_session(self) -> None:
-        pass
+
+class MessageHandlerMixins:
+
+    def __init__(self):
+        self.handler_map: Dict[str, SessionMessageHandler]
+
+    def handle_command(
+        self,
+        session: Session,
+        method: Method,
+        param_or_result: Union[Params, Result],
+    ) -> Optional[Any]:
+        """"""
+        try:
+            func = self.handler_map[normalize_method(method)]
+        except KeyError:
+            raise MethodNotFound
+
+        return func(session, param_or_result)
+
+    def register_handler(self, method: Method, function: SessionMessageHandler) -> None:
+        """"""
+        self.handler_map[normalize_method(method)] = function
 
 
-class BaseClient(ServerProcessManager):
+class RequestManager:
+    """RequestManager manage method mapped to request_id."""
+
+    def __init__(self):
+        self.methods_map: Dict[int, Method] = {}
+        self.request_count = 0
+
+        self._lock = threading.Lock()
+
+    def reset(self):
+        with self._lock:
+            self.methods_map.clear()
+            self.request_count = 0
+
+    def add(self, method: Method) -> int:
+        """add request method to request_map
+
+        Return:
+            request_count: int
+        """
+        with self._lock:
+            self.request_count += 1
+            self.methods_map[self.request_count] = method
+
+            return self.request_count
+
+    def pop(self, request_id: int) -> Method:
+        """pop method paired with request_id
+
+        Return:
+            method: str
+        Raises:
+            KeyError if request_id not found
+        """
+
+        with self._lock:
+            return self.methods_map.pop(request_id)
+
+    def is_pending_request(self, method: Method) -> bool:
+        """check if same method has pending request"""
+
+        with self._lock:
+            return method in self.methods_map
+
+    def cancel_all(self):
+        """cancel all request"""
+
+        with self._lock:
+            self.methods_map.clear()
+
+
+class _MessageExchangeBase(MessageHandlerMixins):
+
+    def __init__(self, *args, **kwargs):
+        self.transport: Transport
+        self.session: Session
+        self._request_manager: RequestManager
+
+    def _reset_managers(self) -> None:
+        self._request_manager.reset()
+
+    def send_message(self, message: Message) -> None:
+        """send message"""
+        content = dumps(message, as_bytes=True)
+        self.transport.write(content)
+
+    def recv_message(self) -> Message:
+        content = self.transport.read()
+        return loads(content)
+
+    def listen(self) -> None:
+        """listen message"""
+        self._reset_managers()
+
+        thread = threading.Thread(target=self._listen_task, daemon=True)
+        thread.start()
+
+
+class ClientCommand(_MessageExchangeBase):
+    """Client command interface"""
+
+    def send_request(self, method: Method, params: Params) -> None:
+        # cancel pending request
+        if self._request_manager.is_pending_request(method):
+            pending_id = self._request_manager.pop(method)
+            self.send_notification("$/cancelRequest", {"id": pending_id})
+
+        req_id = self._request_manager.add(method)
+        self.send_message(Request(req_id, method, params))
+
+    def _handle_response(self, session: Session, response: Response) -> None:
+        try:
+            method = self._request_manager.pop(response.id)
+        except KeyError:
+            # ignore canceled response
+            return
+
+        if error := response.error:
+            print(error["message"], file=sys.stderr)
+            return
+
+        try:
+            self.handle_command(session, method, response.result)
+        except Exception as err:
+            LOGGER.exception(err, exc_info=True)
+
+    def send_notification(self, method: Method, params: Params) -> None:
+        if method in {
+            "textDocument/didOpen",
+            "textDocument/didChange",
+        }:
+            # cancel all current request
+            self._request_manager.cancel_all()
+        self.send_message(Notification(method, params))
+
+
+class ServerCommand(_MessageExchangeBase):
+    """Server command interface"""
+
+    def _handle_request(self, session: Session, request: Request) -> None:
+        result = None
+        error = None
+        try:
+            result = self.handle_command(session, request.method, request.params)
+        except Exception as err:
+            LOGGER.exception(err, exc_info=True)
+            error = transform_error(err)
+
+        self._send_response(request.id, result, error)
+
+    def _send_response(
+        self, id: int, result: Optional[Any] = None, error: Optional[dict] = None
+    ) -> None:
+        self.send_message(Response(id, result, error))
+
+    def _handle_notification(
+        self, session: Session, notification: Notification
+    ) -> None:
+        try:
+            self.handle_command(session, notification.method, notification.params)
+        except Exception as err:
+            LOGGER.exception(err, exc_info=True)
+
+
+class ListenTaskImpl(_MessageExchangeBase):
+
+    def _listen_task(self) -> None:
+        handler_map = {
+            Notification: self._handle_notification,
+            Request: self._handle_request,
+            Response: self._handle_response,
+        }
+
+        while True:
+            try:
+                message = self.recv_message()
+                typ = type(message)
+                handler_map[typ](self.session, message)
+
+            except EOFError:
+                # stdout closed
+                break
+            except Exception:
+                LOGGER.error("error handle message: %r", message, exc_info=True)
+                break
+
+        # terminated
+        self.terminate()
+
+
+class MessageExchangeMixin(ListenTaskImpl, ClientCommand, ServerCommand):
+    """Client - Server Message Manager"""
+
+
+class BaseClient(MessageExchangeMixin, ServerProcessManagerMixin):
     """"""
 
     def __init__(
         self,
-        arguments: ServerArguments,
-        transport_cls: Transport,
+        process: ChildProcess,
+        transport: Transport,
         report_settings: ReportSettings = None,
     ):
-        self.server_process = ChildProcess(arguments.command, arguments.cwd)
-        transport = transport_cls(self.server_process)
 
-        self.message_pool = MessagePool(transport, self.handle, self.terminate)
+        self.server_process = process
+        self.transport = transport
+
         # server message handler
         self.handler_map: Dict[Method, SessionMessageHandler] = dict()
         self._set_default_handler()
 
+        self._request_manager = RequestManager()
         # session data
         self.session = Session(report_settings=report_settings)
 
@@ -124,19 +323,6 @@ class BaseClient(ServerProcessManager):
             if name.startswith(prefix):
                 method = name[len(prefix) :]
                 self.handler_map[normalize_method(method)] = attribute
-
-    def handle(self, method: Method, params: Union[Params, Response]) -> Optional[Any]:
-        """"""
-        try:
-            func = self.handler_map[normalize_method(method)]
-        except KeyError:
-            raise MethodNotFound
-
-        return func(self.session, params)
-
-    def register_handler(self, method: Method, function: SessionMessageHandler) -> None:
-        """"""
-        self.handler_map[normalize_method(method)] = function
 
     def reset_session(self) -> None:
         """reset session state"""

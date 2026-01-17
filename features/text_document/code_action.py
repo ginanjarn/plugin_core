@@ -4,7 +4,7 @@ import sublime
 import sublime_plugin
 
 from ...document import is_valid_document
-from ...message import Response
+from ...message import Result
 from ...session import Session
 from ...uri import path_to_uri
 from ...features.document_updater import Workspace
@@ -81,14 +81,12 @@ class DocumentCodeActionMixins:
             )
 
     def request_textdocument_codeaction(self, params: dict):
-        self.message_pool.send_request("textDocument/codeAction", params)
+        self.send_request("textDocument/codeAction", params)
 
-    def handle_textdocument_codeaction(self, session: Session, response: Response):
-        if err := response.error:
-            print(err["message"])
-
-        elif result := response.result:
-            self.show_action_panels(session, result)
+    def handle_textdocument_codeaction(self, session: Session, result: Result):
+        if not result:
+            return
+        self.show_action_panels(session, result)
 
     def show_action_panels(self, session: Session, code_actions: List[dict]):
         titles = [f"{act['title']} ({act['kind']})" for act in code_actions]

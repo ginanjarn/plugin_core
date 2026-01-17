@@ -3,7 +3,7 @@ from pathlib import Path
 import sublime
 import sublime_plugin
 
-from ..message import Response
+from ..message import Result
 from ..session import Session, InitializeStatus
 from ..uri import path_to_uri
 
@@ -32,7 +32,7 @@ class InitializerMixins:
             return
 
         self.session.set_initialize_status(InitializeStatus.Initializing)
-        self.message_pool.send_request(
+        self.send_request(
             "initialize",
             {
                 "rootPath": workspace_path,
@@ -52,12 +52,8 @@ class InitializerMixins:
             },
         )
 
-    def handle_initialize(self, session: Session, params: Response):
-        if err := params.error:
-            print(err["message"])
-            return
-
-        self.message_pool.send_notification("initialized", {})
+    def handle_initialize(self, session: Session, result: Result):
+        self.send_notification("initialized", {})
         self.session.set_initialize_status(InitializeStatus.Initialized)
 
 

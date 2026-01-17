@@ -5,7 +5,7 @@ import sublime
 import sublime_plugin
 
 from ...document import is_valid_document
-from ...message import Response
+from ...message import Result
 from ...session import Session
 from ...uri import path_to_uri
 from ...features.document_updater import Workspace
@@ -89,13 +89,12 @@ class DocumentRenameMixins:
             )
 
     def request_textdocument_preparerename(self, params: dict):
-        self.message_pool.send_request("textDocument/prepareRename", params)
+        self.send_request("textDocument/prepareRename", params)
 
-    def handle_textdocument_preparerename(self, session: Session, response: Response):
-        if error := response.error:
-            print(error["message"])
-        elif result := response.result:
-            self._prompt_rename(session, result)
+    def handle_textdocument_preparerename(self, session: Session, result: Result):
+        if not result:
+            return
+        self._prompt_rename(session, result)
 
     def _prompt_rename(self, session: Session, symbol_range: dict):
         view = self.rename_target.view
@@ -143,14 +142,13 @@ class DocumentRenameMixins:
             )
 
     def request_textdocument_rename(self, params: dict):
-        self.message_pool.send_request("textDocument/rename", params)
+        self.send_request("textDocument/rename", params)
 
-    def handle_textdocument_rename(self, session: Session, response: Response):
-        if error := response.error:
-            print(error["message"])
-        elif result := response.result:
-            changes = self._get_document_changes(result)
-            Workspace(session).apply_document_changes(changes)
+    def handle_textdocument_rename(self, session: Session, result: Result):
+        if not result:
+            return
+        changes = self._get_document_changes(result)
+        Workspace(session).apply_document_changes(changes)
 
     def _get_document_changes(self, workspace_edit: dict) -> Iterator[dict]:
         for changes in workspace_edit["documentChanges"]:
