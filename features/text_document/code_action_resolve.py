@@ -1,8 +1,8 @@
 from functools import wraps
 from typing import Any, Iterator
 
-from ...message import Result
 from ...features.document_updater import Workspace
+from ...lsprotocol.client import Client, CodeAction
 
 
 def must_initialized(func):
@@ -17,21 +17,20 @@ def must_initialized(func):
     return wrapper
 
 
-class CodeActionResolveMixins:
+class CodeActionResolveMixins(Client):
 
     @must_initialized
     def codeaction_resolve(self, params: Any):
-        self.request_codeaction_resolve(params)
+        self.code_action_resolve_request(params)
 
-    def request_codeaction_resolve(self, params: dict):
-        self.send_request("codeAction/resolve", params)
-
-    def handle_codeaction_resolve(self, context: dict, result: Result):
+    def handle_code_action_resolve_result(
+        self, context: dict, result: CodeAction
+    ) -> None:
         if not result:
             return
         self._handle_action(self.session, result)
 
-    def _handle_action(self, context: dict, action: dict) -> None:
+    def _handle_action(self, context: dict, action: CodeAction) -> None:
         if edit := action.get("edit"):
             changes = self._get_document_changes(edit)
             Workspace(self.session).apply_document_changes(changes)

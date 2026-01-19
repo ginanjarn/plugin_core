@@ -1,12 +1,13 @@
 from collections import namedtuple
 from functools import wraps
+from typing import Union
 import sublime
 import sublime_plugin
 
 from ....constant import COMMAND_PREFIX, LANGUAGE_ID
 from ...document import is_valid_document
-from ...message import Result
 from ...uri import path_to_uri
+from ...lsprotocol.client import Client, SignatureHelp
 
 
 def client_must_ready(func):
@@ -65,7 +66,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentSignatureHelpMixins:
+class DocumentSignatureHelpMixins(Client):
 
     signature_help_target = None
 
@@ -73,17 +74,16 @@ class DocumentSignatureHelpMixins:
     def textdocument_signaturehelp(self, view: sublime.View, row: int, col: int):
         if document := self.session.get_document(view):
             self.signature_help_target = document
-            self.request_textdocument_signaturehelp(
+            self.signature_help_request(
                 {
                     "position": {"line": row, "character": col},
                     "textDocument": {"uri": path_to_uri(document.file_name)},
                 },
             )
 
-    def request_textdocument_signaturehelp(self, params: dict):
-        self.send_request("textDocument/signatureHelp", params)
-
-    def handle_textdocument_signaturehelp(self, context: dict, result: Result):
+    def handle_signature_help_result(
+        self, context: dict, result: Union[SignatureHelp, None]
+    ) -> None:
         if not result:
             return
         signatures = result["signatures"]

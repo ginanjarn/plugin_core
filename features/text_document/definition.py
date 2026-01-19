@@ -1,12 +1,12 @@
 from collections import namedtuple
 from functools import wraps
-from typing import Optional, List
+from typing import Optional, List, Union
 import sublime
 import sublime_plugin
 
 from ...document import is_valid_document
-from ...message import Result
 from ...uri import path_to_uri, uri_to_path
+from ...lsprotocol.client import Client, Definition, DefinitionLink
 
 
 def client_must_ready(func):
@@ -59,7 +59,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentDefinitionMixins:
+class DocumentDefinitionMixins(Client):
 
     definition_target = None
 
@@ -67,17 +67,16 @@ class DocumentDefinitionMixins:
     def textdocument_definition(self, view: sublime.View, row: int, col: int):
         if document := self.session.get_document(view):
             self.definition_target = document
-            self.request_textdocument_definition(
+            self.definition_request(
                 {
                     "position": {"character": col, "line": row},
                     "textDocument": {"uri": path_to_uri(document.file_name)},
                 },
             )
 
-    def request_textdocument_definition(self, params: dict):
-        self.send_request("textDocument/definition", params)
-
-    def handle_textdocument_definition(self, context: dict, result: Result):
+    def handle_definition_result(
+        self, context: dict, result: Union[Definition, List[DefinitionLink], None]
+    ) -> None:
         if not result:
             return
         view = self.definition_target.view

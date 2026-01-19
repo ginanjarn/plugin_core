@@ -1,13 +1,13 @@
 from collections import namedtuple
 from functools import wraps
-from typing import Optional, Iterator
+from typing import Optional, Iterator, Union
 import sublime
 import sublime_plugin
 
 from ...document import is_valid_document
-from ...message import Result
 from ...uri import path_to_uri
 from ...features.document_updater import Workspace
+from ...lsprotocol.client import Client, PrepareRenameResult, WorkspaceEdit
 from ....constant import COMMAND_PREFIX
 
 
@@ -72,7 +72,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentRenameMixins:
+class DocumentRenameMixins(Client):
 
     rename_target = None
 
@@ -80,17 +80,16 @@ class DocumentRenameMixins:
     def textdocument_preparerename(self, view: sublime.View, row: int, col: int):
         if document := self.session.get_document(view):
             self.rename_target = document
-            self.request_textdocument_preparerename(
+            self.prepare_rename_request(
                 {
                     "position": {"character": col, "line": row},
                     "textDocument": {"uri": path_to_uri(document.file_name)},
                 },
             )
 
-    def request_textdocument_preparerename(self, params: dict):
-        self.send_request("textDocument/prepareRename", params)
-
-    def handle_textdocument_preparerename(self, context: dict, result: Result):
+    def handle_prepare_rename_result(
+        self, context: dict, result: Union[PrepareRenameResult, None]
+    ) -> None:
         if not result:
             return
         self._prompt_rename(self.session, result)
@@ -132,7 +131,7 @@ class DocumentRenameMixins:
 
         if document := self.session.get_document(view):
             self.rename_target = document
-            self.request_textdocument_rename(
+            self.rename_request(
                 {
                     "newName": new_name,
                     "position": {"line": row, "character": col},
@@ -140,10 +139,9 @@ class DocumentRenameMixins:
                 }
             )
 
-    def request_textdocument_rename(self, params: dict):
-        self.send_request("textDocument/rename", params)
-
-    def handle_textdocument_rename(self, context: dict, result: Result):
+    def handle_rename_result(
+        self, context: dict, result: Union[WorkspaceEdit, None]
+    ) -> None:
         if not result:
             return
         changes = self._get_document_changes(result)

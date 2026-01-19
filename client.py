@@ -1,10 +1,12 @@
 """client object"""
 
+from __future__ import annotations
+
 import logging
 import threading
 import sys
 from collections.abc import MutableMapping
-from functools import lru_cache, wraps
+from functools import wraps
 from typing import (
     Optional,
     Dict,
@@ -12,12 +14,17 @@ from typing import (
     Any,
     Union,
     Iterator,
+    TYPE_CHECKING,
 )
+
+if TYPE_CHECKING:
+    from typing import _KT, _VT
+
 import sublime
 
 from .child_process import ChildProcess
 from .diagnostics import ReportSettings
-from .errors import MethodNotFound, transform_error
+from .errors import transform_error
 from .message import (
     Message,
     Request,
@@ -30,12 +37,12 @@ from .message import (
     dumps,
 )
 from .session import Session
+from .lsprotocol.client import (
+    Client as LSClient,
+    LSPAny,
+)
 from .transport import Transport
 from ..constant import LOGGING_CHANNEL
-
-_KT = type
-_VT = type
-
 
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
@@ -81,19 +88,6 @@ ResponseHandler = Callable[[Context, Response], None]
 SessionMessageHandler = Union[RequestHandler, NotificationHandler, ResponseHandler]
 
 
-@lru_cache
-def normalize_method(method: Method) -> Method:
-    """normalize_method
-
-    Nomalization steps:
-    * replace '/' with '_'
-    * convert to lower case
-
-    e.g.: textDocument/completion -> textdocument_completion
-    """
-    return method.replace("/", "_").lower()
-
-
 class ServerProcessManagerMixin:
 
     _start_server_lock = threading.Lock()
@@ -121,30 +115,6 @@ class ServerProcessManagerMixin:
         """terminate session"""
         self.server_process.terminate()
         self.reset_session()
-
-
-class MessageHandlerMixins:
-
-    def __init__(self):
-        self.handler_map: Dict[str, SessionMessageHandler]
-
-    def handle_command(
-        self,
-        context: Context,
-        method: Method,
-        param_or_result: Union[Params, Result],
-    ) -> Optional[Any]:
-        """"""
-        try:
-            func = self.handler_map[normalize_method(method)]
-        except KeyError:
-            raise MethodNotFound
-
-        return func(context, param_or_result)
-
-    def register_handler(self, method: Method, function: SessionMessageHandler) -> None:
-        """"""
-        self.handler_map[normalize_method(method)] = function
 
 
 class RequestManager:
@@ -198,7 +168,7 @@ class RequestManager:
             self.methods_map.clear()
 
 
-class _MessageExchangeBase(MessageHandlerMixins):
+class _MessageExchangeBase:
 
     def __init__(self, *args, **kwargs):
         self.transport: Transport
@@ -320,7 +290,24 @@ class MessageExchangeMixin(ListenTaskImpl, ClientCommand, ServerCommand):
     """Client - Server Message Manager"""
 
 
-class BaseClient(MessageExchangeMixin, ServerProcessManagerMixin):
+class LSPMessageExchangeManager(LSClient, MessageExchangeMixin):
+    def request(self, method: str, params: LSPAny) -> None:
+        self.send_request(method, params)
+
+    def notify(self, method: str, params: LSPAny) -> None:
+        self.send_notification(method, params)
+
+    def handle_command(
+        self,
+        context: Context,
+        method: Method,
+        param_or_result: Union[Params, Result],
+    ) -> Optional[Any]:
+        """"""
+        self.handle(context, method, param_or_result)
+
+
+class BaseClient(LSPMessageExchangeManager, ServerProcessManagerMixin):
     """"""
 
     def __init__(
@@ -333,42 +320,9 @@ class BaseClient(MessageExchangeMixin, ServerProcessManagerMixin):
         self.server_process = process
         self.transport = transport
 
-        # server message handler
-        self.handler_map: Dict[Method, SessionMessageHandler] = dict()
-        self._set_default_handler()
-
         self._request_manager = RequestManager()
         # session data
         self.session = Session(report_settings=report_settings)
-
-    def _set_default_handler(self):
-        """set default handler
-
-        Register class method which has following rule as method handler :
-        * method name start with 'handle_'
-        * replace '/' with '_'
-        * convert to lower case
-
-        example:
-          ---------------------------------------------------------
-          rpc method                 handler method name
-          ---------------------------------------------------------
-          textDocument/completion    handle_textdocument_completion
-          textDocument/hover         handle_textdocument_hover
-          textDocument/codeAction    handle_textdocument_codeaction
-          ---------------------------------------------------------
-
-        """
-
-        for name in dir(self):
-            attribute = getattr(self, name)
-            if not callable(attribute):
-                continue
-
-            prefix = "handle_"
-            if name.startswith(prefix):
-                method = name[len(prefix) :]
-                self.handler_map[normalize_method(method)] = attribute
 
     def reset_session(self) -> None:
         """reset session state"""

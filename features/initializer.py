@@ -3,9 +3,9 @@ from pathlib import Path
 import sublime
 import sublime_plugin
 
-from ..message import Result
-from ..session import Session, InitializeStatus
+from ..session import InitializeStatus
 from ..uri import path_to_uri
+from ..lsprotocol.client import Client, InitializeResult
 
 
 class _InitializeCommand(sublime_plugin.TextCommand):
@@ -16,7 +16,7 @@ class _InitializeCommand(sublime_plugin.TextCommand):
         self.client.initialize(self.view)
 
 
-class InitializerMixins:
+class InitializerMixins(Client):
 
     def initialize(self, view: sublime.View):
         # cancel if initializing
@@ -32,8 +32,7 @@ class InitializerMixins:
             return
 
         self.session.set_initialize_status(InitializeStatus.Initializing)
-        self.send_request(
-            "initialize",
+        self.initialize_request(
             {
                 "rootPath": workspace_path,
                 "rootUri": path_to_uri(workspace_path),
@@ -52,8 +51,8 @@ class InitializerMixins:
             },
         )
 
-    def handle_initialize(self, session: Session, result: Result):
-        self.send_notification("initialized", {})
+    def handle_initialize_result(self, context: dict, result: InitializeResult) -> None:
+        self.initialized_notification({})
         self.session.set_initialize_status(InitializeStatus.Initialized)
 
 

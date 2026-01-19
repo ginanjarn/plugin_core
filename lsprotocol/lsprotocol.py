@@ -12,10 +12,16 @@ from typing import (
 	Union,
 	Tuple,
 	Literal,
-	TypeAlias,
 	TypedDict,
-	NotRequired
+	TYPE_CHECKING,
 )
+
+if TYPE_CHECKING:
+	from typing import (
+		NotRequired,
+		TypeAlias,
+	)
+
 
 uinteger: TypeAlias = int
 

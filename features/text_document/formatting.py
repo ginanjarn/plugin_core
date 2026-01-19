@@ -1,14 +1,14 @@
 from collections import namedtuple
 from dataclasses import asdict
 from functools import wraps
-from typing import List
+from typing import List, Union
 import sublime
 import sublime_plugin
 
 from ....constant import COMMAND_PREFIX
 from ...document import is_valid_document, TextChange
-from ...message import Result
 from ...uri import path_to_uri
+from ...lsprotocol.client import Client, TextEdit
 
 
 def client_must_ready(func):
@@ -46,7 +46,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentFormattingMixins:
+class DocumentFormattingMixins(Client):
 
     formatting_target = None
 
@@ -54,14 +54,13 @@ class DocumentFormattingMixins:
     def textdocument_formatting(self, view: sublime.View):
         if document := self.session.get_document(view):
             self.formatting_target = document
-            self.request_textdocument_formatting(
+            self.document_formatting_request(
                 {"textDocument": {"uri": path_to_uri(document.file_name)}}
             )
 
-    def request_textdocument_formatting(self, params: dict):
-        self.send_request("textDocument/formatting", params)
-
-    def handle_textdocument_formatting(self, context: dict, result: Result):
+    def handle_document_formatting_result(
+        self, context: dict, result: Union[List[TextEdit], None]
+    ) -> None:
         if not result:
             return
         changes = [rpc_to_textchange(c) for c in result]

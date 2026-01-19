@@ -1,9 +1,12 @@
 from ...uri import uri_to_path
+from ...lsprotocol.client import Client, PublishDiagnosticsParams
 
 
-class DocumentDiagnosticsMixins:
+class DocumentDiagnosticsMixins(Client):
 
-    def handle_textdocument_publishdiagnostics(self, context: dict, params: dict):
+    def handle_publish_diagnostics_notification(
+        self, context: dict, params: PublishDiagnosticsParams
+    ) -> None:
         file_name = uri_to_path(params["uri"])
         diagnostics = params["diagnostics"]
 

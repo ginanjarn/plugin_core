@@ -5,6 +5,7 @@ import sublime_plugin
 
 from ...document import Document, TextChange, is_valid_document
 from ...uri import path_to_uri
+from ...lsprotocol.client import Client
 
 
 class DocumentSynchronizerMixins:
@@ -109,7 +110,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentSynchronizerMixins:
+class DocumentSynchronizerMixins(Client):
 
     @must_initialized
     def textdocument_didopen(self, view: sublime.View, *, reload: bool = False):
@@ -133,8 +134,7 @@ class DocumentSynchronizerMixins:
         other = self.session.get_document_with_name(view.file_name())
         if not other:
             # Notify server to open document
-            self.send_notification(
-                "textDocument/didOpen",
+            self.did_open_text_document_notification(
                 {
                     "textDocument": {
                         "languageId": document.language_id,
@@ -151,8 +151,7 @@ class DocumentSynchronizerMixins:
     @must_initialized
     def textdocument_didsave(self, view: sublime.View):
         if document := self.session.get_document(view):
-            self.send_notification(
-                "textDocument/didSave",
+            self.did_save_text_document_notification(
                 {"textDocument": {"uri": path_to_uri(document.file_name)}},
             )
 
@@ -173,8 +172,7 @@ class DocumentSynchronizerMixins:
             return
 
         if document := self.session.get_document(view):
-            self.send_notification(
-                "textDocument/didClose",
+            self.did_close_text_document_notification(
                 {"textDocument": {"uri": path_to_uri(document.file_name)}},
             )
 
@@ -183,8 +181,7 @@ class DocumentSynchronizerMixins:
     @must_initialized
     def textdocument_didchange(self, view: sublime.View, changes: List[TextChange]):
         if document := self.session.get_document(view):
-            self.send_notification(
-                "textDocument/didChange",
+            self.did_change_text_document_notification(
                 {
                     "contentChanges": [textchange_to_rpc(c) for c in changes],
                     "textDocument": {

@@ -1,12 +1,12 @@
 from collections import defaultdict
 from functools import wraps
-from typing import List
+from typing import List, Union
 import sublime
 import sublime_plugin
 
 from ...document import is_valid_document
-from ...message import Result
 from ...uri import path_to_uri
+from ...lsprotocol.client import Client, CompletionList, CompletionItem
 
 
 def client_must_ready(func):
@@ -116,7 +116,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentCompletionMixins:
+class DocumentCompletionMixins(Client):
 
     AUTO_COMPLETE_ARGUMENTS = {
         "disable_auto_insert": True,
@@ -130,17 +130,16 @@ class DocumentCompletionMixins:
     def textdocument_completion(self, view: sublime.View, row: int, col: int):
         if document := self.session.get_document(view):
             self.completion_target = document
-            self.request_textdocument_completion(
+            self.completion_request(
                 {
                     "position": {"character": col, "line": row},
                     "textDocument": {"uri": path_to_uri(document.file_name)},
                 },
             )
 
-    def request_textdocument_completion(self, params: dict):
-        self.send_request("textDocument/completion", params)
-
-    def handle_textdocument_completion(self, context: dict, result: Result):
+    def handle_completion_result(
+        self, context: dict, result: Union[List[CompletionItem], CompletionList, None]
+    ) -> None:
         if not result:
             return
         items = [self._build_completion(item) for item in result["items"]]
@@ -150,7 +149,7 @@ class DocumentCompletionMixins:
         view.run_command("auto_complete", self.AUTO_COMPLETE_ARGUMENTS)
 
     @staticmethod
-    def _build_completion(completion_item: dict) -> sublime.CompletionItem:
+    def _build_completion(completion_item: CompletionItem) -> sublime.CompletionItem:
         text = completion_item["label"]
         try:
             insert_text = completion_item["textEdit"]["newText"]

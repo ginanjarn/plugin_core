@@ -1,8 +1,9 @@
 from functools import wraps
+from typing import Union
 import logging
 
 from ....constant import LOGGING_CHANNEL
-from ...message import Result
+from ...lsprotocol.client import Client, LSPAny
 
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
@@ -29,15 +30,14 @@ def must_initialized(func):
     return wrapper
 
 
-class WorkspaceExecuteCommandMixins:
+class WorkspaceExecuteCommandMixins(Client):
 
     def workspace_executecommand(self, commands: dict):
-        self.request_workspace_executecommand(commands)
+        self.execute_command_request(commands)
 
-    def request_workspace_executecommand(self, params: dict):
-        self.send_request("workspace/executeCommand", params)
-
-    def handle_workspace_executecommand(self, context: dict, result: Result) -> dict:
+    def handle_execute_command_result(
+        self, context: dict, result: Union[LSPAny, None]
+    ) -> None:
         if not result:
             return
         LOGGER.info(result)

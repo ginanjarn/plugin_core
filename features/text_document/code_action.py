@@ -1,12 +1,12 @@
 from functools import wraps
-from typing import List, Optional, Iterator
+from typing import List, Optional, Iterator, Union
 import sublime
 import sublime_plugin
 
 from ...document import is_valid_document
-from ...message import Result
 from ...uri import path_to_uri
 from ...features.document_updater import Workspace
+from ...lsprotocol.client import Client, Command, CodeAction
 
 
 def client_must_ready(func):
@@ -45,7 +45,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentCodeActionMixins:
+class DocumentCodeActionMixins(Client):
 
     code_action_target = None
 
@@ -68,7 +68,7 @@ class DocumentCodeActionMixins:
             if action_kinds:
                 context["only"] = list(action_kinds)
 
-            self.request_textdocument_codeaction(
+            self.code_action_request(
                 {
                     "textDocument": {"uri": path_to_uri(document.file_name)},
                     "range": {
@@ -79,10 +79,9 @@ class DocumentCodeActionMixins:
                 },
             )
 
-    def request_textdocument_codeaction(self, params: dict):
-        self.send_request("textDocument/codeAction", params)
-
-    def handle_textdocument_codeaction(self, context: dict, result: Result):
+    def handle_code_action_result(
+        self, context: dict, result: Union[List[Union[Command, CodeAction]], None]
+    ) -> None:
         if not result:
             return
         self.show_action_panels(self.session, result)

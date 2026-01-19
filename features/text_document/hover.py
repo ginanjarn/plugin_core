@@ -2,12 +2,13 @@ import threading
 from collections import namedtuple
 from functools import wraps
 from html import escape as escape_html
+from typing import Union
 import sublime
 import sublime_plugin
 
 from ...document import Document, is_valid_document
-from ...message import Result
 from ...uri import path_to_uri
+from ...lsprotocol.client import Client, Hover
 
 
 def client_must_ready(func):
@@ -53,7 +54,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentHoverMixins:
+class DocumentHoverMixins(Client):
 
     hover_target = None
 
@@ -71,17 +72,14 @@ class DocumentHoverMixins:
                 return
 
             self.hover_target = document
-            self.request_textdocument_hover(
+            self.hover_request(
                 {
                     "position": {"character": col, "line": row},
                     "textDocument": {"uri": path_to_uri(document.file_name)},
                 }
             )
 
-    def request_textdocument_hover(self, params: dict):
-        self.send_request("textDocument/hover", params)
-
-    def handle_textdocument_hover(self, context: dict, result: Result):
+    def handle_hover_result(self, context: dict, result: Union[Hover, None]) -> None:
         if not result:
             return
         message = result["contents"]["value"]

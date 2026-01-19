@@ -1,6 +1,11 @@
 import logging
 from typing import Iterator
 
+from ...lsprotocol.client import (
+    Client,
+    ApplyWorkspaceEditParams,
+    ApplyWorkspaceEditResult,
+)
 from ...features.document_updater import Workspace
 from ....constant import LOGGING_CHANNEL
 
@@ -8,8 +13,10 @@ LOGGER = logging.getLogger(LOGGING_CHANNEL)
 PathStr = str
 
 
-class WorkspaceApplyEditMixins:
-    def handle_workspace_applyedit(self, context: dict, params: dict) -> dict:
+class WorkspaceApplyEditMixins(Client):
+    def handle_apply_workspace_edit_request(
+        self, context: dict, params: ApplyWorkspaceEditParams
+    ) -> ApplyWorkspaceEditResult:
         try:
             changes = self._get_document_changes(params["edit"])
             Workspace(self.session).apply_document_changes(changes)
