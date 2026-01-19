@@ -6,7 +6,6 @@ import sublime_plugin
 from ....constant import COMMAND_PREFIX, LANGUAGE_ID
 from ...document import is_valid_document
 from ...message import Result
-from ...session import Session
 from ...uri import path_to_uri
 
 
@@ -84,7 +83,7 @@ class DocumentSignatureHelpMixins:
     def request_textdocument_signaturehelp(self, params: dict):
         self.send_request("textDocument/signatureHelp", params)
 
-    def handle_textdocument_signaturehelp(self, session: Session, result: Result):
+    def handle_textdocument_signaturehelp(self, context: dict, result: Result):
         if not result:
             return
         signatures = result["signatures"]

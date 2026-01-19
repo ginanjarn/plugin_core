@@ -7,7 +7,6 @@ import sublime_plugin
 
 from ...document import Document, is_valid_document
 from ...message import Result
-from ...session import Session
 from ...uri import path_to_uri
 
 
@@ -82,7 +81,7 @@ class DocumentHoverMixins:
     def request_textdocument_hover(self, params: dict):
         self.send_request("textDocument/hover", params)
 
-    def handle_textdocument_hover(self, session: Session, result: Result):
+    def handle_textdocument_hover(self, context: dict, result: Result):
         if not result:
             return
         message = result["contents"]["value"]

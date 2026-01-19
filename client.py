@@ -3,8 +3,16 @@
 import logging
 import threading
 import sys
-from functools import lru_cache
-from typing import Optional, Dict, Callable, Any, Union
+from collections.abc import MutableMapping
+from functools import lru_cache, wraps
+from typing import (
+    Optional,
+    Dict,
+    Callable,
+    Any,
+    Union,
+    Iterator,
+)
 import sublime
 
 from .child_process import ChildProcess
@@ -25,12 +33,51 @@ from .session import Session
 from .transport import Transport
 from ..constant import LOGGING_CHANNEL
 
+_KT = type
+_VT = type
+
+
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
 
-RequestHandler = Callable[[Session, Params], Any]
-NotificationHandler = Callable[[Session, Params], None]
-ResponseHandler = Callable[[Session, Response], None]
+class Context(MutableMapping):
+    """Context data object
+
+    A dict-like object with thread locking.
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        self.data = dict(*args, **kwargs)
+        self._lock = threading.Lock()
+
+    def lock(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with self._lock:
+                return func(*args, **kwargs)
+
+        return wrapper
+
+    @lock
+    def __setitem__(self, key: _KT, value: _VT) -> None:
+        self.data[key] = value
+
+    @lock
+    def __getitem__(self, key: _KT) -> _VT:
+        return self.data[key]
+
+    @lock
+    def __delitem__(self, key: _KT) -> None:
+        del self.data[key]
+
+    @lock
+    def __iter__(self) -> Iterator[_KT]:
+        yield from iter(self.data)
+
+
+RequestHandler = Callable[[Context, Params], Any]
+NotificationHandler = Callable[[Context, Params], None]
+ResponseHandler = Callable[[Context, Response], None]
 SessionMessageHandler = Union[RequestHandler, NotificationHandler, ResponseHandler]
 
 
@@ -83,7 +130,7 @@ class MessageHandlerMixins:
 
     def handle_command(
         self,
-        session: Session,
+        context: Context,
         method: Method,
         param_or_result: Union[Params, Result],
     ) -> Optional[Any]:
@@ -93,7 +140,7 @@ class MessageHandlerMixins:
         except KeyError:
             raise MethodNotFound
 
-        return func(session, param_or_result)
+        return func(context, param_or_result)
 
     def register_handler(self, method: Method, function: SessionMessageHandler) -> None:
         """"""
@@ -155,7 +202,6 @@ class _MessageExchangeBase(MessageHandlerMixins):
 
     def __init__(self, *args, **kwargs):
         self.transport: Transport
-        self.session: Session
         self._request_manager: RequestManager
 
     def _reset_managers(self) -> None:
@@ -190,7 +236,7 @@ class ClientCommand(_MessageExchangeBase):
         req_id = self._request_manager.add(method)
         self.send_message(Request(req_id, method, params))
 
-    def _handle_response(self, session: Session, response: Response) -> None:
+    def _handle_response(self, context: Context, response: Response) -> None:
         try:
             method = self._request_manager.pop(response.id)
         except KeyError:
@@ -202,7 +248,7 @@ class ClientCommand(_MessageExchangeBase):
             return
 
         try:
-            self.handle_command(session, method, response.result)
+            self.handle_command(context, method, response.result)
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
 
@@ -219,11 +265,11 @@ class ClientCommand(_MessageExchangeBase):
 class ServerCommand(_MessageExchangeBase):
     """Server command interface"""
 
-    def _handle_request(self, session: Session, request: Request) -> None:
+    def _handle_request(self, context: Context, request: Request) -> None:
         result = None
         error = None
         try:
-            result = self.handle_command(session, request.method, request.params)
+            result = self.handle_command(context, request.method, request.params)
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
             error = transform_error(err)
@@ -236,10 +282,10 @@ class ServerCommand(_MessageExchangeBase):
         self.send_message(Response(id, result, error))
 
     def _handle_notification(
-        self, session: Session, notification: Notification
+        self, context: Context, notification: Notification
     ) -> None:
         try:
-            self.handle_command(session, notification.method, notification.params)
+            self.handle_command(context, notification.method, notification.params)
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
 

@@ -6,7 +6,6 @@ import sublime_plugin
 
 from ...document import is_valid_document
 from ...message import Result
-from ...session import Session
 from ...uri import path_to_uri, uri_to_path
 
 
@@ -78,7 +77,7 @@ class DocumentDefinitionMixins:
     def request_textdocument_definition(self, params: dict):
         self.send_request("textDocument/definition", params)
 
-    def handle_textdocument_definition(self, session: Session, result: Result):
+    def handle_textdocument_definition(self, context: dict, result: Result):
         if not result:
             return
         view = self.definition_target.view

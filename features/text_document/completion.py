@@ -6,7 +6,6 @@ import sublime_plugin
 
 from ...document import is_valid_document
 from ...message import Result
-from ...session import Session
 from ...uri import path_to_uri
 
 
@@ -141,7 +140,7 @@ class DocumentCompletionMixins:
     def request_textdocument_completion(self, params: dict):
         self.send_request("textDocument/completion", params)
 
-    def handle_textdocument_completion(self, session: Session, result: Result):
+    def handle_textdocument_completion(self, context: dict, result: Result):
         if not result:
             return
         items = [self._build_completion(item) for item in result["items"]]

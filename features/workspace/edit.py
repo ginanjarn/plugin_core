@@ -1,7 +1,6 @@
 import logging
 from typing import Iterator
 
-from ...session import Session
 from ...features.document_updater import Workspace
 from ....constant import LOGGING_CHANNEL
 
@@ -10,10 +9,10 @@ PathStr = str
 
 
 class WorkspaceApplyEditMixins:
-    def handle_workspace_applyedit(self, session: Session, params: dict) -> dict:
+    def handle_workspace_applyedit(self, context: dict, params: dict) -> dict:
         try:
             changes = self._get_document_changes(params["edit"])
-            Workspace(session).apply_document_changes(changes)
+            Workspace(self.session).apply_document_changes(changes)
 
         except Exception as err:
             LOGGER.error(err, exc_info=True)

@@ -8,7 +8,6 @@ import sublime_plugin
 from ....constant import COMMAND_PREFIX
 from ...document import is_valid_document, TextChange
 from ...message import Result
-from ...session import Session
 from ...uri import path_to_uri
 
 
@@ -62,7 +61,7 @@ class DocumentFormattingMixins:
     def request_textdocument_formatting(self, params: dict):
         self.send_request("textDocument/formatting", params)
 
-    def handle_textdocument_formatting(self, session: Session, result: Result):
+    def handle_textdocument_formatting(self, context: dict, result: Result):
         if not result:
             return
         changes = [rpc_to_textchange(c) for c in result]

@@ -3,7 +3,6 @@ import logging
 
 from ....constant import LOGGING_CHANNEL
 from ...message import Result
-from ...session import Session
 
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
@@ -38,7 +37,7 @@ class WorkspaceExecuteCommandMixins:
     def request_workspace_executecommand(self, params: dict):
         self.send_request("workspace/executeCommand", params)
 
-    def handle_workspace_executecommand(self, session: Session, result: Result) -> dict:
+    def handle_workspace_executecommand(self, context: dict, result: Result) -> dict:
         if not result:
             return
         LOGGER.info(result)

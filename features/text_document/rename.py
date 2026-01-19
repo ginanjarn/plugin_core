@@ -6,7 +6,6 @@ import sublime_plugin
 
 from ...document import is_valid_document
 from ...message import Result
-from ...session import Session
 from ...uri import path_to_uri
 from ...features.document_updater import Workspace
 from ....constant import COMMAND_PREFIX
@@ -91,12 +90,12 @@ class DocumentRenameMixins:
     def request_textdocument_preparerename(self, params: dict):
         self.send_request("textDocument/prepareRename", params)
 
-    def handle_textdocument_preparerename(self, session: Session, result: Result):
+    def handle_textdocument_preparerename(self, context: dict, result: Result):
         if not result:
             return
-        self._prompt_rename(session, result)
+        self._prompt_rename(self.session, result)
 
-    def _prompt_rename(self, session: Session, symbol_range: dict):
+    def _prompt_rename(self, context: dict, symbol_range: dict):
         view = self.rename_target.view
 
         start = LineCharacter(**symbol_range["range"]["start"])
@@ -144,11 +143,11 @@ class DocumentRenameMixins:
     def request_textdocument_rename(self, params: dict):
         self.send_request("textDocument/rename", params)
 
-    def handle_textdocument_rename(self, session: Session, result: Result):
+    def handle_textdocument_rename(self, context: dict, result: Result):
         if not result:
             return
         changes = self._get_document_changes(result)
-        Workspace(session).apply_document_changes(changes)
+        Workspace(self.session).apply_document_changes(changes)
 
     def _get_document_changes(self, workspace_edit: dict) -> Iterator[dict]:
         for changes in workspace_edit["documentChanges"]:

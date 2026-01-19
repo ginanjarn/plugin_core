@@ -5,7 +5,6 @@ import sublime_plugin
 
 from ...document import is_valid_document
 from ...message import Result
-from ...session import Session
 from ...uri import path_to_uri
 from ...features.document_updater import Workspace
 
@@ -83,18 +82,18 @@ class DocumentCodeActionMixins:
     def request_textdocument_codeaction(self, params: dict):
         self.send_request("textDocument/codeAction", params)
 
-    def handle_textdocument_codeaction(self, session: Session, result: Result):
+    def handle_textdocument_codeaction(self, context: dict, result: Result):
         if not result:
             return
-        self.show_action_panels(session, result)
+        self.show_action_panels(self.session, result)
 
-    def show_action_panels(self, session: Session, code_actions: List[dict]):
+    def show_action_panels(self, context: dict, code_actions: List[dict]):
         titles = [f"{act['title']} ({act['kind']})" for act in code_actions]
 
         def on_select_action(index=-1):
             if index < 0:
                 return
-            self._handle_selected_action(session, code_actions[index])
+            self._handle_selected_action(self.session, code_actions[index])
 
         sublime.active_window().show_quick_panel(
             titles,
@@ -102,10 +101,10 @@ class DocumentCodeActionMixins:
             flags=sublime.MONOSPACE_FONT,
         )
 
-    def _handle_selected_action(self, session: Session, action: dict) -> None:
+    def _handle_selected_action(self, context: dict, action: dict) -> None:
         if edit := action.get("edit"):
             changes = self._get_document_changes(edit)
-            Workspace(session).apply_document_changes(changes)
+            Workspace(self.session).apply_document_changes(changes)
         if command := action.get("command"):
             self.workspace_executecommand(command)
 
