@@ -1,6 +1,6 @@
 from collections import namedtuple
 from functools import wraps
-from typing import Optional, Iterator, Union
+from typing import Optional, Union
 import sublime
 import sublime_plugin
 
@@ -9,52 +9,6 @@ from ...uri import path_to_uri
 from ...features.document_updater import Workspace
 from ...lsprotocol.client import Client, PrepareRenameResult, WorkspaceEdit
 from ....constant import COMMAND_PREFIX
-
-
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
-
-
-class _PrepareRenameCommand(sublime_plugin.TextCommand):
-    client = None
-
-    @client_must_ready
-    def run(self, edit: sublime.Edit, event: Optional[dict] = None):
-        if not is_valid_document(self.view):
-            return
-
-        try:
-            point = event["text_point"]
-        except (AttributeError, KeyError):
-            point = self.view.sel()[0].begin()
-
-        row, col = self.view.rowcol(point)
-        self.client.textdocument_preparerename(self.view, row, col)
-
-    def is_visible(self):
-        return is_valid_document(self.view)
-
-    def want_event(self):
-        return True
-
-
-class _RenameCommand(sublime_plugin.TextCommand):
-    client = None
-
-    @client_must_ready
-    def run(self, edit: sublime.Edit, row: int, column: int, new_name: str):
-        if not is_valid_document(self.view):
-            return
-        self.client.textdocument_rename(self.view, row, column, new_name)
-
-    def is_visible(self):
-        return is_valid_document(self.view)
 
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
@@ -144,9 +98,50 @@ class DocumentRenameMixins(Client):
     ) -> None:
         if not result:
             return
-        changes = self._get_document_changes(result)
-        Workspace(self.session).apply_document_changes(changes)
+        Workspace(self.session).apply_workspace_edit(result)
 
-    def _get_document_changes(self, workspace_edit: dict) -> Iterator[dict]:
-        for changes in workspace_edit["documentChanges"]:
-            yield changes
+
+def client_must_ready(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if self.client and self.client.is_ready():
+            return func(self, *args, **kwargs)
+        return None
+
+    return wrapper
+
+
+class _PrepareRenameCommand(sublime_plugin.TextCommand):
+    client: DocumentRenameMixins = None
+
+    @client_must_ready
+    def run(self, edit: sublime.Edit, event: Optional[dict] = None):
+        if not is_valid_document(self.view):
+            return
+
+        try:
+            point = event["text_point"]
+        except (AttributeError, KeyError):
+            point = self.view.sel()[0].begin()
+
+        row, col = self.view.rowcol(point)
+        self.client.textdocument_preparerename(self.view, row, col)
+
+    def is_visible(self):
+        return is_valid_document(self.view)
+
+    def want_event(self):
+        return True
+
+
+class _RenameCommand(sublime_plugin.TextCommand):
+    client: DocumentRenameMixins = None
+
+    @client_must_ready
+    def run(self, edit: sublime.Edit, row: int, column: int, new_name: str):
+        if not is_valid_document(self.view):
+            return
+        self.client.textdocument_rename(self.view, row, column, new_name)
+
+    def is_visible(self):
+        return is_valid_document(self.view)

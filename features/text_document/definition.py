@@ -6,40 +6,7 @@ import sublime_plugin
 
 from ...document import is_valid_document
 from ...uri import path_to_uri, uri_to_path
-from ...lsprotocol.client import Client, Definition, DefinitionLink
-
-
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
-
-
-class _GotoDefinitionCommand(sublime_plugin.TextCommand):
-    client = None
-
-    @client_must_ready
-    def run(self, edit: sublime.Edit, event: Optional[dict] = None):
-        if not is_valid_document(self.view):
-            return
-
-        try:
-            point = event["text_point"]
-        except (AttributeError, KeyError):
-            point = self.view.sel()[0].begin()
-
-        row, column = self.view.rowcol(point)
-        self.client.textdocument_definition(self.view, row, column)
-
-    def is_visible(self):
-        return is_valid_document(self.view)
-
-    def want_event(self):
-        return True
+from ...lsprotocol.client import Client, Definition, Location, DefinitionLink
 
 
 PathEncodedStr = str
@@ -80,58 +47,98 @@ class DocumentDefinitionMixins(Client):
         if not result:
             return
         view = self.definition_target.view
-        locations = [self._build_location(l) for l in result]
-        open_location(view, locations)
+        if isinstance(result, list):
+            locations = [self._build_location(l) for l in result]
+        else:
+            locations = [self._build_location(result)]
+
+        LocationSelector(view, locations).show_panel()
 
     @staticmethod
-    def _build_location(location: dict) -> PathEncodedStr:
-        file_name = uri_to_path(location["uri"])
-        start_row, start_col = LineCharacter(**location["range"]["start"])
+    def _build_location(location: Union[Location, DefinitionLink]) -> PathEncodedStr:
+        try:
+            file_name = uri_to_path(location["uri"])
+            start_row, start_col = LineCharacter(**location["range"]["start"])
+        except KeyError:
+            file_name = uri_to_path(location["targetUri"])
+            start_row, start_col = LineCharacter(**location["targetRange"]["start"])
+
         return f"{file_name}:{start_row+1}:{start_col+1}"
 
 
-def set_selection(view: sublime.View, regions: List[sublime.Region]):
-    """"""
-    view.sel().clear()
-    view.sel().add_all(regions)
+class LocationSelector:
+
+    def __init__(self, current_view: sublime.View, locations: List[PathEncodedStr]):
+        self.current_view = current_view
+        self.window = current_view.window()
+
+        self._visible_region = current_view.visible_region()
+        self._selections = list(current_view.sel())
+        self._locations = locations
+
+        self._opened_view = None
+
+    def show_panel(self):
+        self.window.show_quick_panel(
+            items=self._locations,
+            on_select=self.on_select,
+            flags=sublime.MONOSPACE_FONT,
+            on_highlight=self.on_highlight,
+            placeholder="Open location...",
+        )
+
+    def open_file(self, file_name: PathEncodedStr, preview: bool = False):
+        """open document"""
+        flags = sublime.ENCODED_POSITION
+        if preview:
+            flags |= sublime.TRANSIENT
+
+        self.window.open_file(file_name, flags=flags)
+
+    def on_select(self, index: int):
+        if index < 0:
+            self.on_cancel()
+        else:
+            self.open_file(self._locations[index])
+
+    def on_highlight(self, index: int):
+        self.open_file(self._locations[index], preview=True)
+
+    def on_cancel(self):
+        self.window.focus_view(self.current_view)
+        self.current_view.sel().clear()
+        self.current_view.sel().add_all(self._selections)
+        self.current_view.show(self._visible_region)
 
 
-def open_document(
-    window: sublime.Window, file_name: PathEncodedStr, preview: bool = False
-):
-    """open document"""
-    flags = sublime.ENCODED_POSITION
-    if preview:
-        flags |= sublime.TRANSIENT
+def client_must_ready(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if self.client and self.client.is_ready():
+            return func(self, *args, **kwargs)
+        return None
 
-    window.open_file(file_name, flags=flags)
+    return wrapper
 
 
-def open_location(current_view: sublime.View, locations: List[PathEncodedStr]) -> None:
-    """"""
-    current_window = current_view.window()
-    current_selections = list(current_view.sel())
-    current_visible_region = current_view.visible_region()
+class _GotoDefinitionCommand(sublime_plugin.TextCommand):
+    client: DocumentDefinitionMixins = None
 
-    locations = sorted(locations)
-
-    def open_location(index):
-        if index >= 0:
-            open_document(current_window, locations[index])
+    @client_must_ready
+    def run(self, edit: sublime.Edit, event: Optional[dict] = None):
+        if not is_valid_document(self.view):
             return
 
-        # else: revert to current state
-        current_window.focus_view(current_view)
-        set_selection(current_view, current_selections)
-        current_view.show(current_visible_region, show_surrounds=False)
+        try:
+            point = event["text_point"]
+        except (AttributeError, KeyError):
+            point = self.view.sel()[0].begin()
 
-    def preview_location(index):
-        open_document(current_window, locations[index], preview=True)
+        row, column = self.view.rowcol(point)
+        self.client.textdocument_definition(self.view, row, column)
 
-    current_window.show_quick_panel(
-        items=locations,
-        on_select=open_location,
-        flags=sublime.MONOSPACE_FONT,
-        on_highlight=preview_location,
-        placeholder="Open location...",
-    )
+    def is_visible(self):
+        return is_valid_document(self.view)
+
+    def want_event(self):
+        return True

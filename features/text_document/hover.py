@@ -11,34 +11,6 @@ from ...uri import path_to_uri
 from ...lsprotocol.client import Client, Hover
 
 
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
-
-
-class HoverEventListener(sublime_plugin.EventListener):
-    client = None
-
-    @client_must_ready
-    def on_hover(self, view: sublime.View, point: int, hover_zone: sublime.HoverZone):
-        if hover_zone != sublime.HoverZone.TEXT:
-            return
-        if not is_valid_document(view):
-            return
-        row, col = view.rowcol(point)
-        threading.Thread(target=self._on_hover_task, args=(view, row, col)).start()
-
-    def _on_hover_task(self, view: sublime.View, row: int, col: int):
-        # Hover may be not in current active document, open it
-        self.client.textdocument_didopen(view)
-        self.client.textdocument_hover(view, row, col)
-
-
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
 
@@ -119,3 +91,31 @@ class DocumentHoverMixins(Client):
         title = "### Diagnostics:\n"
         diagnostic_message = "\n".join([f"- {escape_html(d)}" for d in items])
         return f"{title}\n{diagnostic_message}"
+
+
+def client_must_ready(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if self.client and self.client.is_ready():
+            return func(self, *args, **kwargs)
+        return None
+
+    return wrapper
+
+
+class HoverEventListener(sublime_plugin.EventListener):
+    client: DocumentHoverMixins = None
+
+    @client_must_ready
+    def on_hover(self, view: sublime.View, point: int, hover_zone: sublime.HoverZone):
+        if hover_zone != sublime.HoverZone.TEXT:
+            return
+        if not is_valid_document(view):
+            return
+        row, col = view.rowcol(point)
+        threading.Thread(target=self._on_hover_task, args=(view, row, col)).start()
+
+    def _on_hover_task(self, view: sublime.View, row: int, col: int):
+        # Hover may be not in current active document, open it
+        self.client.textdocument_didopen(view)
+        self.client.textdocument_hover(view, row, col)

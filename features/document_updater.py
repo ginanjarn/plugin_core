@@ -1,7 +1,7 @@
 from collections import namedtuple
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import List
+from typing import List, Dict, Union
 
 import sublime
 import sublime_plugin
@@ -9,6 +9,15 @@ import sublime_plugin
 from ..document import TextChange
 from ..session import Session
 from ..uri import uri_to_path
+from ..lsprotocol.lsprotocol import (
+    WorkspaceEdit,
+    TextEdit,
+    DocumentUri,
+    TextDocumentEdit,
+    CreateFile,
+    RenameFile,
+    DeleteFile,
+)
 from ...constant import COMMAND_PREFIX
 
 
@@ -22,32 +31,43 @@ class Workspace:
     def __init__(self, session: Session):
         self.session = session
 
-    def apply_document_changes(self, changes: List[dict]):
-        for change in changes:
-            self._apply_change(change)
+    def apply_workspace_edit(self, edit: WorkspaceEdit):
+        if changes := edit.get("changes"):
+            self._apply_changes(changes)
+        if document_changes := edit.get("documentChanges"):
+            self.apply_document_changes(document_changes)
 
-    def _apply_change(self, change: dict) -> None:
-        # change type must one of TextDocumentEdit|CreateFile|RenameFile|DeleteFile
-        if "kind" in change:
-            # CreateFile | RenameFile | DeleteFile
-            self._apply_resource_change(change)
-        else:
-            # TextDocumentEdit
-            self._apply_text_document_edit(change)
+    def _apply_changes(self, changes: Dict[DocumentUri, List[TextEdit]]):
+        for uri, text_edit in changes.items():
+            self.apply_text_edit(uri_to_path(uri), text_edit)
+
+    def apply_document_changes(
+        self, changes: List[Union[TextDocumentEdit, CreateFile, RenameFile, DeleteFile]]
+    ):
+        for change in changes:
+            if "kind" in change:
+                # CreateFile | RenameFile | DeleteFile
+                self._apply_resource_change(change)
+            else:
+                # TextDocumentEdit
+                self._apply_text_document_edit(change)
 
     def _apply_resource_change(self, resource_changes: dict) -> None:
         resource_change_map = {
-            "create": self._create_document,
-            "rename": self._rename_document,
-            "delete": self._delete_document,
+            "create": self._create_file,
+            "rename": self._rename_file,
+            "delete": self._delete_file,
         }
         kind = resource_changes["kind"]
         resource_change_map[kind](resource_changes)
 
-    def _apply_text_document_edit(self, text_document_edit: dict):
+    def _apply_text_document_edit(self, text_document_edit: TextDocumentEdit):
         file_name = uri_to_path(text_document_edit["textDocument"]["uri"])
-        text_changes = [rpc_to_textchange(c) for c in text_document_edit["edits"]]
+        edits = text_document_edit["edits"]
+        self.apply_text_edit(file_name, edits)
 
+    def apply_text_edit(self, file_name: str, edits: List[TextEdit]):
+        text_changes = [rpc_to_textchange(c) for c in edits]
         if document := self.session.get_document_with_name(file_name):
             view = document.view
             self._apply_view_changes(view, text_changes)
@@ -63,12 +83,12 @@ class Workspace:
         )
 
     @staticmethod
-    def _create_document(resource_changes: dict):
+    def _create_file(resource_changes: CreateFile):
         file_name = uri_to_path(resource_changes["textDocument"]["uri"])
         Path(file_name).touch(exist_ok=True)
 
     @staticmethod
-    def _rename_document(resource_changes: dict):
+    def _rename_file(resource_changes: RenameFile):
         old = uri_to_path(resource_changes["oldUri"])
         new = uri_to_path(resource_changes["newUri"])
         Path(old).rename(new)
@@ -80,7 +100,7 @@ class Workspace:
             view.retarget(new)
 
     @staticmethod
-    def _delete_document(resource_changes: dict):
+    def _delete_file(resource_changes: DeleteFile):
         file_name = uri_to_path(resource_changes["textDocument"]["uri"])
         Path(file_name).unlink()
 
@@ -91,7 +111,7 @@ class Workspace:
             view.close()
 
 
-def rpc_to_textchange(change: dict) -> TextChange:
+def rpc_to_textchange(change: TextEdit) -> TextChange:
     """"""
     return TextChange(
         LineCharacter(**change["range"]["start"]),

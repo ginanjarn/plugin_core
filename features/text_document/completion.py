@@ -9,69 +9,6 @@ from ...uri import path_to_uri
 from ...lsprotocol.client import Client, CompletionList, CompletionItem
 
 
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
-
-
-class CompletionEventListener(sublime_plugin.EventListener):
-    client = None
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.prev_completion_point = 0
-
-    @client_must_ready
-    def on_query_completions(
-        self, view: sublime.View, prefix: str, locations: List[int]
-    ) -> sublime.CompletionList:
-        if not is_valid_document(view):
-            return None
-
-        point = min(locations)
-        if (
-            document := self.client.completion_target
-        ) and document.is_completion_available():
-
-            items = document.pop_completion()
-            if (not items) or self._is_context_changed(
-                view, self.prev_completion_point, point
-            ):
-                self.hide_completions(view)
-                return None
-
-            return sublime.CompletionList(items, flags=sublime.INHIBIT_WORD_COMPLETIONS)
-
-        self.prev_completion_point = point
-
-        row, col = view.rowcol(point)
-        self.client.textdocument_completion(view, row, col)
-        self.hide_completions(view)
-
-        return None
-
-    def _is_context_changed(self, view: sublime.View, old: int, new: int) -> bool:
-        """check if context moved from old point"""
-
-        # point unchanged
-        if old == new:
-            return False
-        # point changed but still in same word
-        word = view.word(old)
-        if new in word and view.substr(word).isidentifier():
-            return False
-
-        return True
-
-    def hide_completions(self, view: sublime.View):
-        view.run_command("hide_auto_complete")
-
-
 COMPLETION_KIND_MAP = defaultdict(
     lambda: sublime.KIND_AMBIGUOUS,
     {
@@ -142,7 +79,11 @@ class DocumentCompletionMixins(Client):
     ) -> None:
         if not result:
             return
-        items = [self._build_completion(item) for item in result["items"]]
+        if isinstance(result, list):
+            items = [self._build_completion(item) for item in result]
+        else:
+            items = [self._build_completion(item) for item in result["items"]]
+
         self.completion_target.set_completion(items)
 
         view = self.completion_target.view
@@ -150,18 +91,81 @@ class DocumentCompletionMixins(Client):
 
     @staticmethod
     def _build_completion(completion_item: CompletionItem) -> sublime.CompletionItem:
-        text = completion_item["label"]
+        label = completion_item["label"]
         try:
             insert_text = completion_item["textEdit"]["newText"]
         except KeyError:
-            insert_text = text
+            insert_text = label
 
-        annotation = completion_item.get("detail", "")
-        kind = COMPLETION_KIND_MAP[completion_item["kind"]]
+        detail = completion_item.get("detail", "")
+        kind = COMPLETION_KIND_MAP[completion_item.get("kind", 1)]
 
         return sublime.CompletionItem.snippet_completion(
-            trigger=text,
+            trigger=label,
             snippet=insert_text,
-            annotation=annotation,
+            annotation=detail,
             kind=kind,
         )
+
+
+def client_must_ready(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if self.client and self.client.is_ready():
+            return func(self, *args, **kwargs)
+        return None
+
+    return wrapper
+
+
+class CompletionEventListener(sublime_plugin.EventListener):
+    client: DocumentCompletionMixins = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.prev_completion_point = 0
+
+    @client_must_ready
+    def on_query_completions(
+        self, view: sublime.View, prefix: str, locations: List[int]
+    ) -> sublime.CompletionList:
+        if not is_valid_document(view):
+            return None
+
+        point = min(locations)
+        if (
+            document := self.client.completion_target
+        ) and document.is_completion_available():
+
+            items = document.pop_completion()
+            if (not items) or self._is_context_changed(
+                view, self.prev_completion_point, point
+            ):
+                self.hide_completions(view)
+                return None
+
+            return sublime.CompletionList(items, flags=sublime.INHIBIT_WORD_COMPLETIONS)
+
+        self.prev_completion_point = point
+
+        row, col = view.rowcol(point)
+        self.client.textdocument_completion(view, row, col)
+        self.hide_completions(view)
+
+        return None
+
+    def _is_context_changed(self, view: sublime.View, old: int, new: int) -> bool:
+        """check if context moved from old point"""
+
+        # point unchanged
+        if old == new:
+            return False
+        # point changed but still in same word
+        word = view.word(old)
+        if new in word and view.substr(word).isidentifier():
+            return False
+
+        return True
+
+    def hide_completions(self, view: sublime.View):
+        view.run_command("hide_auto_complete")

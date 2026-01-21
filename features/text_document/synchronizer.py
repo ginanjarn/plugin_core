@@ -6,96 +6,7 @@ import sublime_plugin
 from ...document import Document, TextChange, is_valid_document
 from ...uri import path_to_uri
 from ...lsprotocol.client import Client
-
-
-class DocumentSynchronizerMixins:
-    client = None
-
-    def didopen(self, view: sublime.View, *, reload: bool = False):
-        if not is_valid_document(view):
-            return
-        self.client.textdocument_didopen(view, reload=reload)
-
-    def didsave(self, view: sublime.View):
-        if not is_valid_document(view):
-            return
-        self.client.textdocument_didsave(view)
-
-    def didclose(self, view: sublime.View):
-        if not is_valid_document(view):
-            return
-        self.client.textdocument_didclose(view)
-
-    def didchange(self, view: sublime.View, changes: List[TextChange]):
-        if not is_valid_document(view):
-            return
-        self.client.textdocument_didchange(view, changes)
-
-
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
-
-
-class DocumentSynchronizeEventListener(
-    DocumentSynchronizerMixins, sublime_plugin.EventListener
-):
-
-    @client_must_ready
-    def on_activated_async(self, view: sublime.View):
-        self.didopen(view)
-
-    @client_must_ready
-    def on_load_async(self, view: sublime.View):
-        self.didopen(view, reload=True)
-
-    @client_must_ready
-    def on_reload_async(self, view: sublime.View):
-        self.didopen(view, reload=True)
-
-    @client_must_ready
-    def on_revert_async(self, view: sublime.View):
-        self.didopen(view, reload=True)
-
-    @client_must_ready
-    def on_post_save_async(self, view: sublime.View):
-        self.didsave(view)
-
-    @client_must_ready
-    def on_close(self, view: sublime.View):
-        self.didclose(view)
-
-    @client_must_ready
-    def on_associate_buffer_async(self, buffer: sublime.Buffer):
-        # close all associated buffer
-        for view in buffer.views():
-            self.didclose(view)
-        # then reopen active view
-        self.didopen(buffer.primary_view())
-
-
-class DocumentSynchronizeTextChangeListener(
-    DocumentSynchronizerMixins, sublime_plugin.TextChangeListener
-):
-
-    @client_must_ready
-    def on_text_changed(self, changes: List[sublime.TextChange]):
-        view = self.buffer.primary_view()
-        if not is_valid_document(view):
-            return
-        self.didchange(view, [self._to_text_change(c) for c in changes])
-
-    @staticmethod
-    def _to_text_change(change: sublime.TextChange) -> TextChange:
-        """"""
-        start = (change.a.row, change.a.col)
-        end = (change.b.row, change.b.col)
-        return TextChange(start, end, change.str, change.len_utf8)
+from ...lsprotocol.lsprotocol import TextDocumentContentChangePartial
 
 
 def must_initialized(func):
@@ -192,7 +103,7 @@ class DocumentSynchronizerMixins(Client):
             )
 
 
-def textchange_to_rpc(text_change: TextChange) -> dict:
+def textchange_to_rpc(text_change: TextChange) -> TextDocumentContentChangePartial:
     """"""
     start = text_change.start
     end = text_change.end
@@ -204,3 +115,93 @@ def textchange_to_rpc(text_change: TextChange) -> dict:
         "rangeLength": text_change.length,
         "text": text_change.text,
     }
+
+
+class SynchronizeEventAdapter:
+    client: DocumentSynchronizerMixins = None
+
+    def didopen(self, view: sublime.View, *, reload: bool = False):
+        if not is_valid_document(view):
+            return
+        self.client.textdocument_didopen(view, reload=reload)
+
+    def didsave(self, view: sublime.View):
+        if not is_valid_document(view):
+            return
+        self.client.textdocument_didsave(view)
+
+    def didclose(self, view: sublime.View):
+        if not is_valid_document(view):
+            return
+        self.client.textdocument_didclose(view)
+
+    def didchange(self, view: sublime.View, changes: List[TextChange]):
+        if not is_valid_document(view):
+            return
+        self.client.textdocument_didchange(view, changes)
+
+
+def client_must_ready(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if self.client and self.client.is_ready():
+            return func(self, *args, **kwargs)
+        return None
+
+    return wrapper
+
+
+class DocumentSynchronizeEventListener(
+    SynchronizeEventAdapter, sublime_plugin.EventListener
+):
+
+    @client_must_ready
+    def on_activated_async(self, view: sublime.View):
+        self.didopen(view)
+
+    @client_must_ready
+    def on_load_async(self, view: sublime.View):
+        self.didopen(view, reload=True)
+
+    @client_must_ready
+    def on_reload_async(self, view: sublime.View):
+        self.didopen(view, reload=True)
+
+    @client_must_ready
+    def on_revert_async(self, view: sublime.View):
+        self.didopen(view, reload=True)
+
+    @client_must_ready
+    def on_post_save_async(self, view: sublime.View):
+        self.didsave(view)
+
+    @client_must_ready
+    def on_close(self, view: sublime.View):
+        self.didclose(view)
+
+    @client_must_ready
+    def on_associate_buffer_async(self, buffer: sublime.Buffer):
+        # close all associated buffer
+        for view in buffer.views():
+            self.didclose(view)
+        # then reopen active view
+        self.didopen(buffer.primary_view())
+
+
+class DocumentSynchronizeTextChangeListener(
+    SynchronizeEventAdapter, sublime_plugin.TextChangeListener
+):
+
+    @client_must_ready
+    def on_text_changed(self, changes: List[sublime.TextChange]):
+        view = self.buffer.primary_view()
+        if not is_valid_document(view):
+            return
+        self.didchange(view, [self._to_text_change(c) for c in changes])
+
+    @staticmethod
+    def _to_text_change(change: sublime.TextChange) -> TextChange:
+        """"""
+        start = (change.a.row, change.a.col)
+        end = (change.b.row, change.b.col)
+        return TextChange(start, end, change.str, change.len_utf8)

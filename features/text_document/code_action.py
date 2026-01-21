@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import List, Optional, Iterator, Union
+from typing import List, Optional, Union
 import sublime
 import sublime_plugin
 
@@ -7,30 +7,6 @@ from ...document import is_valid_document
 from ...uri import path_to_uri
 from ...features.document_updater import Workspace
 from ...lsprotocol.client import Client, Command, CodeAction
-
-
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
-
-
-class _CodeActionCommand(sublime_plugin.TextCommand):
-    client = None
-
-    @client_must_ready
-    def run(self, edit: sublime.Edit, kinds: List[str] = None):
-        if not is_valid_document(self.view):
-            return
-
-        self.client.textdocument_codeaction(self.view, self.view.sel()[0], kinds)
-
-    def is_visible(self):
-        return is_valid_document(self.view)
 
 
 def must_initialized(func):
@@ -54,7 +30,7 @@ class DocumentCodeActionMixins(Client):
         self,
         view: sublime.View,
         region: sublime.Region,
-        action_kinds: Optional[List[int]] = None,
+        code_action_kinds: Optional[List[str]] = None,
     ):
         if document := self.session.get_document(view):
             self.code_action_target = document
@@ -65,8 +41,8 @@ class DocumentCodeActionMixins(Client):
                 "diagnostics": document.diagnostics,
                 "triggerKind": 2,
             }
-            if action_kinds:
-                context["only"] = list(action_kinds)
+            if code_action_kinds:
+                context["only"] = list(code_action_kinds)
 
             self.code_action_request(
                 {
@@ -84,15 +60,21 @@ class DocumentCodeActionMixins(Client):
     ) -> None:
         if not result:
             return
-        self.show_action_panels(self.session, result)
 
-    def show_action_panels(self, context: dict, code_actions: List[dict]):
-        titles = [f"{act['title']} ({act['kind']})" for act in code_actions]
+        code_actions = result
+
+        def build_title(action: Union[Command, CodeAction]):
+            title = action["title"]
+            if kind := action.get("kind"):
+                return f"{title} ({kind})"
+            return f"{title}"
+
+        titles = [build_title(act) for act in code_actions]
 
         def on_select_action(index=-1):
             if index < 0:
                 return
-            self._handle_selected_action(self.session, code_actions[index])
+            self._handle_selected_action(context, code_actions[index])
 
         sublime.active_window().show_quick_panel(
             titles,
@@ -100,13 +82,34 @@ class DocumentCodeActionMixins(Client):
             flags=sublime.MONOSPACE_FONT,
         )
 
-    def _handle_selected_action(self, context: dict, action: dict) -> None:
+    def _handle_selected_action(
+        self, context: dict, action: Union[Command, CodeAction]
+    ) -> None:
         if edit := action.get("edit"):
-            changes = self._get_document_changes(edit)
-            Workspace(self.session).apply_document_changes(changes)
+            Workspace(self.session).apply_workspace_edit(edit)
         if command := action.get("command"):
             self.workspace_executecommand(command)
 
-    def _get_document_changes(self, workspace_edit: dict) -> Iterator[dict]:
-        for changes in workspace_edit["documentChanges"]:
-            yield changes
+
+def client_must_ready(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if self.client and self.client.is_ready():
+            return func(self, *args, **kwargs)
+        return None
+
+    return wrapper
+
+
+class _CodeActionCommand(sublime_plugin.TextCommand):
+    client: DocumentCodeActionMixins = None
+
+    @client_must_ready
+    def run(self, edit: sublime.Edit, kinds: List[str] = None):
+        if not is_valid_document(self.view):
+            return
+
+        self.client.textdocument_codeaction(self.view, self.view.sel()[0], kinds)
+
+    def is_visible(self):
+        return is_valid_document(self.view)

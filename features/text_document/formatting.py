@@ -1,37 +1,12 @@
-from collections import namedtuple
-from dataclasses import asdict
 from functools import wraps
 from typing import List, Union
 import sublime
 import sublime_plugin
 
-from ....constant import COMMAND_PREFIX
-from ...document import is_valid_document, TextChange
+from ...document import is_valid_document
+from ..document_updater import Workspace
 from ...uri import path_to_uri
 from ...lsprotocol.client import Client, TextEdit
-
-
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
-
-
-class _DocumentFormattingCommand(sublime_plugin.TextCommand):
-    client = None
-
-    @client_must_ready
-    def run(self, edit: sublime.Edit):
-        if not is_valid_document(self.view):
-            return
-        self.client.textdocument_formatting(self.view)
-
-    def is_visible(self):
-        return is_valid_document(self.view)
 
 
 def must_initialized(func):
@@ -63,25 +38,29 @@ class DocumentFormattingMixins(Client):
     ) -> None:
         if not result:
             return
-        changes = [rpc_to_textchange(c) for c in result]
-        self.apply_view_changes(self.formatting_target.view, changes)
-
-    @staticmethod
-    def apply_view_changes(view: sublime.View, text_changes: List[TextChange]):
-        view.run_command(
-            f"{COMMAND_PREFIX}_apply_text_changes",
-            {"changes": [asdict(c) for c in text_changes]},
+        Workspace(self.session).apply_text_edit(
+            self.formatting_target.file_name, result
         )
 
 
-LineCharacter = namedtuple("LineCharacter", ["line", "character"])
+def client_must_ready(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if self.client and self.client.is_ready():
+            return func(self, *args, **kwargs)
+        return None
+
+    return wrapper
 
 
-def rpc_to_textchange(change: dict) -> TextChange:
-    """"""
-    return TextChange(
-        LineCharacter(**change["range"]["start"]),
-        LineCharacter(**change["range"]["end"]),
-        change["newText"],
-        change.get("rangeLength", 0),
-    )
+class _DocumentFormattingCommand(sublime_plugin.TextCommand):
+    client: DocumentFormattingMixins = None
+
+    @client_must_ready
+    def run(self, edit: sublime.Edit):
+        if not is_valid_document(self.view):
+            return
+        self.client.textdocument_formatting(self.view)
+
+    def is_visible(self):
+        return is_valid_document(self.view)

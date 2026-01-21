@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Any, Iterator
+from typing import Any
 
 from ...features.document_updater import Workspace
 from ...lsprotocol.client import Client, CodeAction
@@ -32,11 +32,6 @@ class CodeActionResolveMixins(Client):
 
     def _handle_action(self, context: dict, action: CodeAction) -> None:
         if edit := action.get("edit"):
-            changes = self._get_document_changes(edit)
-            Workspace(self.session).apply_document_changes(changes)
+            Workspace(self.session).apply_workspace_edit(edit)
         if command := action.get("command"):
             self.workspace_executecommand(command)
-
-    def _get_document_changes(self, workspace_edit: dict) -> Iterator[dict]:
-        for changes in workspace_edit["documentChanges"]:
-            yield changes

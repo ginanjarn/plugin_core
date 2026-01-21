@@ -1,21 +1,12 @@
 from functools import wraps
 from typing import Union
 import logging
+import sublime_plugin
 
 from ....constant import LOGGING_CHANNEL
 from ...lsprotocol.client import Client, LSPAny
 
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
-
-
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
 
 
 def must_initialized(func):
@@ -41,3 +32,24 @@ class WorkspaceExecuteCommandMixins(Client):
         if not result:
             return
         LOGGER.info(result)
+
+
+def client_must_ready(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if self.client and self.client.is_ready():
+            return func(self, *args, **kwargs)
+        return None
+
+    return wrapper
+
+
+class _WorkspaceExecuteCommandCommand(sublime_plugin.WindowCommand):
+    client: WorkspaceExecuteCommandMixins = None
+
+    @client_must_ready
+    def run(self, command: dict):
+        self.client.workspace_executecommand(command)
+
+    def is_visible(self):
+        return self.client and self.client.is_ready()
