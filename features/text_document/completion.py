@@ -1,5 +1,6 @@
 from collections import defaultdict
 from functools import wraps
+from threading import Lock
 from typing import List, Union
 import sublime
 import sublime_plugin
@@ -8,6 +9,12 @@ from ...document import is_valid_document
 from ...uri import path_to_uri
 from ...lsprotocol.client import Client, CompletionList, CompletionItem
 
+
+class _Empty:
+    """Explicit empty value"""
+
+
+EMPTY = _Empty()
 
 COMPLETION_KIND_MAP = defaultdict(
     lambda: sublime.KIND_AMBIGUOUS,
@@ -63,6 +70,23 @@ class DocumentCompletionMixins(Client):
 
     completion_target = None
 
+    _cached_completions: List[sublime.CompletionItem] = EMPTY
+    _cached_completions_lock = Lock()
+
+    def is_completions_available(self) -> bool:
+        with self._cached_completions_lock:
+            return self._cached_completions is not EMPTY
+
+    def set_completions(self, completions: List[sublime.CompletionItem]):
+        with self._cached_completions_lock:
+            self._cached_completions = completions
+
+    def pop_completions(self) -> List[sublime.CompletionItem]:
+        with self._cached_completions_lock:
+            completions = self._cached_completions
+            self._cached_completions = EMPTY
+            return completions
+
     @must_initialized
     def textdocument_completion(self, view: sublime.View, row: int, col: int):
         if document := self.session.get_document(view):
@@ -79,13 +103,13 @@ class DocumentCompletionMixins(Client):
     ) -> None:
         if not result:
             return
+
         if isinstance(result, list):
             items = [self._build_completion(item) for item in result]
         else:
             items = [self._build_completion(item) for item in result["items"]]
 
-        self.completion_target.set_completion(items)
-
+        self.set_completions(items)
         view = self.completion_target.view
         view.run_command("auto_complete", self.AUTO_COMPLETE_ARGUMENTS)
 
@@ -123,7 +147,7 @@ class CompletionEventListener(sublime_plugin.EventListener):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.prev_completion_point = 0
+        self.prev_trigger_location = 0
 
     @client_must_ready
     def on_query_completions(
@@ -132,23 +156,22 @@ class CompletionEventListener(sublime_plugin.EventListener):
         if not is_valid_document(view):
             return None
 
-        point = min(locations)
-        if (
-            document := self.client.completion_target
-        ) and document.is_completion_available():
+        # trigger on first location
+        location = min(locations)
 
-            items = document.pop_completion()
+        if self.client.is_completions_available():
+            items = self.client.pop_completions()
             if (not items) or self._is_context_changed(
-                view, self.prev_completion_point, point
+                view, self.prev_trigger_location, location
             ):
                 self.hide_completions(view)
                 return None
 
             return sublime.CompletionList(items, flags=sublime.INHIBIT_WORD_COMPLETIONS)
 
-        self.prev_completion_point = point
+        self.prev_trigger_location = location
 
-        row, col = view.rowcol(point)
+        row, col = view.rowcol(location)
         self.client.textdocument_completion(view, row, col)
         self.hide_completions(view)
 
