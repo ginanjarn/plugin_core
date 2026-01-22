@@ -3,7 +3,7 @@ from typing import List
 import sublime
 import sublime_plugin
 
-from ...document import Document, TextChange, is_valid_document
+from ...document import Document, is_valid_document
 from ...uri import path_to_uri
 from ...lsprotocol.client import Client
 from ...lsprotocol.lsprotocol import TextDocumentContentChangePartial
@@ -90,11 +90,13 @@ class DocumentSynchronizerMixins(Client):
         self.session.remove_document(view)
 
     @must_initialized
-    def textdocument_didchange(self, view: sublime.View, changes: List[TextChange]):
+    def textdocument_didchange(
+        self, view: sublime.View, changes: List[sublime.TextChange]
+    ):
         if document := self.session.get_document(view):
             self.did_change_text_document_notification(
                 {
-                    "contentChanges": [textchange_to_rpc(c) for c in changes],
+                    "contentChanges": [self._textchange_to_rpc(c) for c in changes],
                     "textDocument": {
                         "uri": path_to_uri(document.file_name),
                         "version": document.version,
@@ -102,19 +104,22 @@ class DocumentSynchronizerMixins(Client):
                 },
             )
 
+    @staticmethod
+    def _textchange_to_rpc(
+        change: sublime.TextChange,
+    ) -> TextDocumentContentChangePartial:
+        """"""
+        start = (change.a.row, change.a.col)
+        end = (change.b.row, change.b.col)
 
-def textchange_to_rpc(text_change: TextChange) -> TextDocumentContentChangePartial:
-    """"""
-    start = text_change.start
-    end = text_change.end
-    return {
-        "range": {
-            "start": {"line": start[0], "character": start[1]},
-            "end": {"line": end[0], "character": end[1]},
-        },
-        "rangeLength": text_change.length,
-        "text": text_change.text,
-    }
+        return {
+            "range": {
+                "start": {"line": start[0], "character": start[1]},
+                "end": {"line": end[0], "character": end[1]},
+            },
+            "rangeLength": change.len_utf8,
+            "text": change.str,
+        }
 
 
 class SynchronizeEventAdapter:
@@ -135,7 +140,7 @@ class SynchronizeEventAdapter:
             return
         self.client.textdocument_didclose(view)
 
-    def didchange(self, view: sublime.View, changes: List[TextChange]):
+    def didchange(self, view: sublime.View, changes: List[sublime.TextChange]):
         if not is_valid_document(view):
             return
         self.client.textdocument_didchange(view, changes)
@@ -197,11 +202,4 @@ class DocumentSynchronizeTextChangeListener(
         view = self.buffer.primary_view()
         if not is_valid_document(view):
             return
-        self.didchange(view, [self._to_text_change(c) for c in changes])
-
-    @staticmethod
-    def _to_text_change(change: sublime.TextChange) -> TextChange:
-        """"""
-        start = (change.a.row, change.a.col)
-        end = (change.b.row, change.b.col)
-        return TextChange(start, end, change.str, change.len_utf8)
+        self.didchange(view, changes)
