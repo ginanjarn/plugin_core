@@ -29,6 +29,8 @@ def must_initialized(func):
 class DocumentHoverMixins(Client):
 
     hover_target = None
+    hover_point = 0
+    diagnostic_message = ""
 
     @must_initialized
     def textdocument_hover(self, view: sublime.View, row: int, col: int):
@@ -39,9 +41,12 @@ class DocumentHoverMixins(Client):
             other.view.hide_popup()
 
         if document := self.session.get_document(view):
-            if message := self._get_diagnostic_message(document, row, col):
-                self.show_popup(view, message, row, col)
-                return
+            self.hover_point = view.text_point(row, col)
+
+            diagnostic_message = self._get_diagnostic_message(document, row, col)
+            self.diagnostic_message = diagnostic_message
+            if diagnostic_message:
+                self.show_popup(view, diagnostic_message, self.hover_point, "markdown")
 
             self.hover_target = document
             self.hover_request(
@@ -54,30 +59,45 @@ class DocumentHoverMixins(Client):
     def handle_hover_result(self, context: dict, result: Union[Hover, None]) -> None:
         if not result:
             return
-        message = result["contents"]["value"]
-        row, col = LineCharacter(**result["range"]["start"])
-        self.show_popup(self.hover_target.view, message, row, col)
+
+        text, markup = self._get_hover_content(result)
+        popup_content = "\n***\n".join([self.diagnostic_message, text])
+        self.show_popup(self.hover_target.view, popup_content, self.hover_point, markup)
+
+    def _get_hover_content(self, hover: Hover) -> tuple:
+        markup = "plaintext"
+        contents = hover["contents"]
+
+        if isinstance(contents, dict):
+            value = contents["value"]
+            markup = contents.get("kind", "plaintext")
+        elif isinstance(contents, str):
+            value = contents
+
+        elif isinstance(contents, list):
+            values = []
+            for c in contents:
+                if isinstance(c, str):
+                    values.append(c)
+                if isinstance(contents[0], dict):
+                    values.append(c["value"])
+            value = "\n".join(values)
+
+        return value, markup
 
     @staticmethod
-    def show_popup(
-        view: sublime.View,
-        text: str,
-        row: int,
-        col: int,
-        keep_visible: bool = False,
-    ):
-        point = view.text_point(row, col)
+    def show_popup(view: sublime.View, text: str, location: int, markup: str):
         view.run_command(
             "marked_popup",
             {
-                "location": point,
+                "location": location,
                 "text": text,
-                "markup": "markdown",
-                "keep_visible": keep_visible,
+                "markup": markup,
             },
         )
 
-    def _get_diagnostic_message(self, document: Document, row: int, col: int):
+    @staticmethod
+    def _get_diagnostic_message(document: Document, row: int, col: int):
         items = [
             d["message"]
             for d in document.diagnostics
