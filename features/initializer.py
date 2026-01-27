@@ -324,8 +324,9 @@ class InitializerMixins(Client):
 
     def initialize(self, view: sublime.View):
         # cancel if initializing
-        if self.session.is_initializing():
+        if self.session.initialize_status is InitializeStatus.Initializing:
             return
+        self.session.initialize_status = InitializeStatus.Initializing
 
         # check if view not closed
         if view is None:
@@ -334,8 +335,8 @@ class InitializerMixins(Client):
         workspace_path = get_workspace_path(view)
         if not workspace_path:
             return
+        self.session.workspace_path = workspace_path
 
-        self.session.set_initialize_status(InitializeStatus.Initializing)
         params = DEFAULT_PARAMS.copy()
         params["rootPath"] = workspace_path
         params["rootUri"] = path_to_uri(workspace_path)
@@ -359,8 +360,11 @@ class InitializerMixins(Client):
 
     def handle_initialize_result(self, context: dict, result: InitializeResult) -> None:
         self.session.server_capabilities = result["capabilities"]
+        self.initialized()
+
+    def initialized(self):
         self.initialized_notification({})
-        self.session.set_initialize_status(InitializeStatus.Initialized)
+        self.session.initialize_status = InitializeStatus.Initialized
 
 
 def get_workspace_path(view: sublime.View, return_parent: bool = True) -> str:
