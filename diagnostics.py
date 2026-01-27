@@ -34,7 +34,7 @@ class DiagnosticItem:
             message = f"{message} ({source})"
         # resolve highlight region if start == end
         if region.empty():
-            region.a -= 1
+            region.b += 1
 
         return cls(diagnostic["severity"], region, message)
 
