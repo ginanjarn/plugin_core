@@ -304,7 +304,7 @@ class LSPMessageExchangeManager(LSClient, MessageExchangeMixin):
         param_or_result: Union[Params, Result],
     ) -> Optional[Any]:
         """"""
-        self.handle(context, method, param_or_result)
+        return self.handle(context, method, param_or_result)
 
 
 class BaseClient(LSPMessageExchangeManager, ServerProcessManagerMixin):
