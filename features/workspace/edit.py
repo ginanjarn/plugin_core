@@ -5,7 +5,7 @@ from ...lsprotocol.client import (
     ApplyWorkspaceEditParams,
     ApplyWorkspaceEditResult,
 )
-from ...features.document_updater import Workspace
+from ...features.workspace.workspace_edit import WorkspaceEdit
 from ....constant import LOGGING_CHANNEL
 
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
@@ -16,7 +16,7 @@ class WorkspaceApplyEditMixins(Client):
         self, context: dict, params: ApplyWorkspaceEditParams
     ) -> ApplyWorkspaceEditResult:
         try:
-            Workspace(self.session).apply_workspace_edit(params["edit"])
+            WorkspaceEdit(self.session).apply(params["edit"])
         except Exception as err:
             LOGGER.error(err, exc_info=True)
             return {"applied": False}

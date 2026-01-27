@@ -4,7 +4,7 @@ import sublime
 import sublime_plugin
 
 from ...document import is_valid_document
-from ..document_updater import Workspace
+from ...features.workspace.workspace_edit import WorkspaceEdit
 from ...uri import path_to_uri
 from ...lsprotocol.client import Client, TextEdit
 
@@ -38,7 +38,7 @@ class DocumentFormattingMixins(Client):
     ) -> None:
         if not result:
             return
-        Workspace(self.session).apply_text_edit(
+        WorkspaceEdit(self.session).apply_text_edit(
             self.formatting_target.file_name, result
         )
 

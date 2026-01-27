@@ -5,7 +5,7 @@ import sublime_plugin
 
 from ...document import is_valid_document
 from ...uri import path_to_uri
-from ...features.document_updater import Workspace
+from ...features.workspace.workspace_edit import WorkspaceEdit
 from ...lsprotocol.client import Client, Command, CodeAction
 
 
@@ -86,7 +86,7 @@ class DocumentCodeActionMixins(Client):
         self, context: dict, action: Union[Command, CodeAction]
     ) -> None:
         if edit := action.get("edit"):
-            Workspace(self.session).apply_workspace_edit(edit)
+            WorkspaceEdit(self.session).apply(edit)
         if command := action.get("command"):
             self.workspace_executecommand(command)
 

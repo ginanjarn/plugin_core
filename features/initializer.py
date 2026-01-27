@@ -356,6 +356,8 @@ class InitializerMixins(Client):
             "labelDetailsSupport"
         ] = True
         params["capabilities"]["textDocument"]["rename"]["prepareSupport"] = True
+
+        self.session.client_capabilities = params["capabilities"]
         self.initialize_request(params)
 
     def handle_initialize_result(self, context: dict, result: InitializeResult) -> None:

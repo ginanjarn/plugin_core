@@ -6,7 +6,7 @@ import sublime_plugin
 
 from ...document import is_valid_document
 from ...uri import path_to_uri
-from ...features.document_updater import Workspace
+from ...features.workspace.workspace_edit import WorkspaceEdit
 from ...lsprotocol.client import Client, PrepareRenameResult, WorkspaceEdit
 from ....constant import COMMAND_PREFIX
 
@@ -98,7 +98,7 @@ class DocumentRenameMixins(Client):
     ) -> None:
         if not result:
             return
-        Workspace(self.session).apply_workspace_edit(result)
+        WorkspaceEdit(self.session).apply_workspace_edit(result)
 
 
 def client_must_ready(func):
