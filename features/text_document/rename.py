@@ -7,7 +7,7 @@ import sublime_plugin
 from ...document import is_valid_document
 from ...uri import path_to_uri
 from ...features.workspace.workspace_edit import WorkspaceEdit
-from ...lsprotocol.client import Client, PrepareRenameResult, WorkspaceEdit
+from ...lsprotocol.client import Client, PrepareRenameResult, WorkspaceEdit as LspWorkspaceEdit
 from ....constant import COMMAND_PREFIX
 
 
@@ -32,6 +32,8 @@ class DocumentRenameMixins(Client):
 
     @must_initialized
     def textdocument_preparerename(self, view: sublime.View, row: int, col: int):
+        if not self.session.server_capabilities.get("renameProvider", False):
+            return
         if document := self.session.get_document(view):
             self.rename_target = document
             self.prepare_rename_request(
@@ -79,6 +81,8 @@ class DocumentRenameMixins(Client):
     def textdocument_rename(
         self, view: sublime.View, row: int, col: int, new_name: str
     ):
+        if not self.session.server_capabilities.get("renameProvider", False):
+            return
         # Save all changes before perform rename
         for document in self.session.get_documents():
             document.view.run_command("save")
@@ -94,7 +98,7 @@ class DocumentRenameMixins(Client):
             )
 
     def handle_rename_result(
-        self, context: dict, result: Union[WorkspaceEdit, None]
+        self, context: dict, result: Union[LspWorkspaceEdit, None]
     ) -> None:
         if not result:
             return

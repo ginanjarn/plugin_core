@@ -34,6 +34,8 @@ class DocumentHoverMixins(Client):
 
     @must_initialized
     def textdocument_hover(self, view: sublime.View, row: int, col: int):
+        if not self.session.server_capabilities.get("hoverProvider", False):
+            return
         # method = "textDocument/hover"
         # In multi row/column layout, new popup will created in current View,
         # but active popup doesn't discarded.

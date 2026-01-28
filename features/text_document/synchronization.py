@@ -25,6 +25,10 @@ class DocumentSynchronizerMixins(Client):
 
     @must_initialized
     def textdocument_didopen(self, view: sublime.View, *, reload: bool = False):
+        capabilities = self.session.server_capabilities.get("textDocumentSync", {})
+        if not capabilities.get("openClose", False):
+            return
+
         # check if view not closed
         if not (view and view.is_valid()):
             return
@@ -61,6 +65,10 @@ class DocumentSynchronizerMixins(Client):
 
     @must_initialized
     def textdocument_didsave(self, view: sublime.View):
+        capabilities = self.session.server_capabilities.get("textDocumentSync", {})
+        if not capabilities.get("save", False):
+            return
+
         if document := self.session.get_document(view):
             self.did_save_text_document_notification(
                 {"textDocument": {"uri": path_to_uri(document.file_name)}},
@@ -72,6 +80,9 @@ class DocumentSynchronizerMixins(Client):
 
     @must_initialized
     def textdocument_didclose(self, view: sublime.View):
+        capabilities = self.session.server_capabilities.get("textDocumentSync", {})
+        if not capabilities.get("openClose", False):
+            return
 
         # Check if the document open in multiple view like side-by-side layout
         documents = self.session.get_documents(
@@ -93,10 +104,20 @@ class DocumentSynchronizerMixins(Client):
     def textdocument_didchange(
         self, view: sublime.View, changes: List[sublime.TextChange]
     ):
+        capabilities = self.session.server_capabilities.get("textDocumentSync", {})
+        change_mode = capabilities.get("change", 0)
+        if not change_mode:
+            return
+
         if document := self.session.get_document(view):
+            if change_mode == 1:
+                contentChanges = {"text": view.substr(sublime.Region(0, view.size()))}
+            elif change_mode == 2:
+                contentChanges = [self._textchange_to_rpc(c) for c in changes]
+
             self.did_change_text_document_notification(
                 {
-                    "contentChanges": [self._textchange_to_rpc(c) for c in changes],
+                    "contentChanges": contentChanges,
                     "textDocument": {
                         "uri": path_to_uri(document.file_name),
                         "version": document.version,

@@ -32,6 +32,8 @@ class DocumentDefinitionMixins(Client):
 
     @must_initialized
     def textdocument_definition(self, view: sublime.View, row: int, col: int):
+        if not self.session.server_capabilities.get("definitionProvider", False):
+            return
         if document := self.session.get_document(view):
             self.definition_target = document
             self.definition_request(

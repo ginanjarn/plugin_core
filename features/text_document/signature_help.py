@@ -31,6 +31,9 @@ class DocumentSignatureHelpMixins(Client):
 
     @must_initialized
     def textdocument_signaturehelp(self, view: sublime.View, row: int, col: int):
+        capabilities = self.session.server_capabilities.get("signatureHelpProvider", {})
+        if not capabilities:
+            return
         if document := self.session.get_document(view):
             self.signature_help_target = document
             self.signature_help_request(

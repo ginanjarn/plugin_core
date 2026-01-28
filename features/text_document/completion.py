@@ -89,6 +89,9 @@ class DocumentCompletionMixins(Client):
 
     @must_initialized
     def textdocument_completion(self, view: sublime.View, row: int, col: int):
+        capabilities = self.session.server_capabilities.get("completionProvider", None)
+        if not capabilities:
+            return
         if document := self.session.get_document(view):
             self.completion_target = document
             self.completion_request(

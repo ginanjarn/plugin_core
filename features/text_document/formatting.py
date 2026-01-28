@@ -27,6 +27,8 @@ class DocumentFormattingMixins(Client):
 
     @must_initialized
     def textdocument_formatting(self, view: sublime.View):
+        if not self.session.server_capabilities.get("documentFormattingProvider", False):
+            return
         if document := self.session.get_document(view):
             self.formatting_target = document
             self.document_formatting_request(

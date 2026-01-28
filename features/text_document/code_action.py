@@ -32,6 +32,8 @@ class DocumentCodeActionMixins(Client):
         region: sublime.Region,
         code_action_kinds: Optional[List[str]] = None,
     ):
+        if not self.session.server_capabilities.get("codeActionProvider", False):
+            return
         if document := self.session.get_document(view):
             self.code_action_target = document
             start = view.rowcol(region.begin())
