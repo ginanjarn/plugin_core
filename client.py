@@ -44,6 +44,20 @@ from .lsprotocol.client import (
 from .transport import Transport
 from ..constant import LOGGING_CHANNEL
 
+from .features.initializer import InitializerMixins
+from .features.text_document.synchronization import DocumentSynchronizerMixins
+from .features.text_document.completion import DocumentCompletionMixins
+from .features.text_document.signature_help import DocumentSignatureHelpMixins
+from .features.text_document.hover import DocumentHoverMixins
+from .features.text_document.formatting import DocumentFormattingMixins
+from .features.text_document.definition import DocumentDefinitionMixins
+from .features.text_document.rename import DocumentRenameMixins
+from .features.text_document.diagnostics import DocumentDiagnosticsMixins
+from .features.workspace.execute_command import WorkspaceExecuteCommandMixins
+from .features.workspace.apply_edit import WorkspaceApplyEditMixins
+from .features.window.message import WindowMessageMixins
+
+
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
 
@@ -331,3 +345,21 @@ class BaseClient(LSPMessageExchangeManager, ServerProcessManagerMixin):
     def is_ready(self) -> bool:
         """check session is ready"""
         return self.server_process.is_running() and self.session.is_initialized()
+
+
+class Client(
+    BaseClient,
+    InitializerMixins,
+    DocumentSynchronizerMixins,
+    DocumentCompletionMixins,
+    DocumentDefinitionMixins,
+    DocumentDiagnosticsMixins,
+    DocumentFormattingMixins,
+    DocumentHoverMixins,
+    DocumentRenameMixins,
+    DocumentSignatureHelpMixins,
+    WorkspaceExecuteCommandMixins,
+    WorkspaceApplyEditMixins,
+    WindowMessageMixins,
+):
+    """Client Implementation"""
