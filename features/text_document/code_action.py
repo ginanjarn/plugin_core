@@ -89,8 +89,10 @@ class DocumentCodeActionMixins(Client):
     ) -> None:
         if edit := action.get("edit"):
             WorkspaceEdit(self.session).apply(edit)
-        if command := action.get("command"):
+        elif command := action.get("command"):
             self.workspace_executecommand(command)
+        else:
+            self.codeaction_resolve(action)
 
 
 def client_must_ready(func):
