@@ -102,7 +102,7 @@ class DocumentRenameMixins(Client):
     ) -> None:
         if not result:
             return
-        WorkspaceEdit(self.session).apply_workspace_edit(result)
+        WorkspaceEdit(self.session).apply(result)
 
 
 def client_must_ready(func):
