@@ -76,7 +76,7 @@ class DocumentCodeActionMixins(Client):
         def on_select_action(index=-1):
             if index < 0:
                 return
-            self._handle_selected_action(context, code_actions[index])
+            self._handle_code_action(context, code_actions[index])
 
         sublime.active_window().show_quick_panel(
             titles,
@@ -84,7 +84,7 @@ class DocumentCodeActionMixins(Client):
             flags=sublime.MONOSPACE_FONT,
         )
 
-    def _handle_selected_action(
+    def _handle_code_action(
         self, context: dict, action: Union[Command, CodeAction]
     ) -> None:
         if edit := action.get("edit"):
@@ -93,6 +93,17 @@ class DocumentCodeActionMixins(Client):
             self.workspace_executecommand(command)
         else:
             self.codeaction_resolve(action)
+
+    @must_initialized
+    def codeaction_resolve(self, params: CodeAction):
+        self.code_action_resolve_request(params)
+
+    def handle_code_action_resolve_result(
+        self, context: dict, result: CodeAction
+    ) -> None:
+        if not result:
+            return
+        self._handle_code_action(self.session, result)
 
 
 def client_must_ready(func):
