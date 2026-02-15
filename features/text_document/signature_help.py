@@ -52,7 +52,7 @@ class DocumentSignatureHelpMixins(Client):
         if not signatures:
             return
 
-        message = "".join(
+        content = "".join(
             [
                 f"```{LANGUAGE_ID}\n",
                 "\n".join([s["label"] for s in signatures]),
@@ -60,25 +60,17 @@ class DocumentSignatureHelpMixins(Client):
             ]
         )
         view = self.signature_help_target.view
-        row, col = view.rowcol(view.sel()[0].a)
-        self.show_popup(view, message, row, col)
+        location = view.sel()[0].a
+        self.show_signature_popup(view, content, location, "markdown")
 
     @staticmethod
-    def show_popup(
-        view: sublime.View,
-        text: str,
-        row: int,
-        col: int,
-        keep_visible: bool = False,
-    ):
-        point = view.text_point(row, col)
+    def show_signature_popup(view: sublime.View, text: str, location: int, markup: str):
         view.run_command(
             "marked_popup",
             {
-                "location": point,
+                "location": location,
                 "text": text,
-                "markup": "markdown",
-                "keep_visible": keep_visible,
+                "markup": markup,
             },
         )
 

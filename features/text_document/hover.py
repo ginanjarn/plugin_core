@@ -48,7 +48,7 @@ class DocumentHoverMixins(Client):
             diagnostic_message = self._get_diagnostic_message(document, row, col)
             self.diagnostic_message = diagnostic_message
             if diagnostic_message:
-                self.show_popup(view, diagnostic_message, self.hover_point, "markdown")
+                self.show_hover_popup(view, diagnostic_message, self.hover_point, "markdown")
 
             self.hover_target = document
             self.hover_request(
@@ -64,7 +64,7 @@ class DocumentHoverMixins(Client):
 
         text, markup = self._get_hover_content(result)
         popup_content = "\n***\n".join([self.diagnostic_message, text])
-        self.show_popup(self.hover_target.view, popup_content, self.hover_point, markup)
+        self.show_hover_popup(self.hover_target.view, popup_content, self.hover_point, markup)
 
     def _get_hover_content(self, hover: Hover) -> tuple:
         markup = "plaintext"
@@ -88,7 +88,7 @@ class DocumentHoverMixins(Client):
         return value, markup
 
     @staticmethod
-    def show_popup(view: sublime.View, text: str, location: int, markup: str):
+    def show_hover_popup(view: sublime.View, text: str, location: int, markup: str):
         view.run_command(
             "marked_popup",
             {
