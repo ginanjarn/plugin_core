@@ -48,7 +48,9 @@ class DocumentHoverMixins(Client):
             diagnostic_message = self._get_diagnostic_message(document, row, col)
             self.diagnostic_message = diagnostic_message
             if diagnostic_message:
-                self.show_hover_popup(view, diagnostic_message, self.hover_point, "markdown")
+                self.show_hover_popup(
+                    view, diagnostic_message, self.hover_point, "markdown"
+                )
 
             self.hover_target = document
             self.hover_request(
@@ -64,7 +66,9 @@ class DocumentHoverMixins(Client):
 
         text, markup = self._get_hover_content(result)
         popup_content = "\n***\n".join([self.diagnostic_message, text])
-        self.show_hover_popup(self.hover_target.view, popup_content, self.hover_point, markup)
+        self.show_hover_popup(
+            self.hover_target.view, popup_content, self.hover_point, markup
+        )
 
     def _get_hover_content(self, hover: Hover) -> tuple:
         markup = "plaintext"
@@ -101,7 +105,7 @@ class DocumentHoverMixins(Client):
     @staticmethod
     def _get_diagnostic_message(document: Document, row: int, col: int):
         items = [
-            d["message"]
+            ": ".join([d.get("code", ""), d["message"]])
             for d in document.diagnostics
             if LineCharacter(**d["range"]["start"])
             <= LineCharacter(row, col)
@@ -110,9 +114,7 @@ class DocumentHoverMixins(Client):
         if not items:
             return ""
 
-        title = "### Diagnostics:\n"
-        diagnostic_message = "\n".join([f"- {escape_html(d)}" for d in items])
-        return f"{title}\n{diagnostic_message}"
+        return "\n".join([f"- {escape_html(d)}" for d in items])
 
 
 def client_must_ready(func):
