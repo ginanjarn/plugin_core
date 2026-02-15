@@ -11,7 +11,7 @@ from sublime import View
 
 from ..constant import LOGGING_CHANNEL
 from .document import Document
-from .diagnostics import DiagnosticManager
+from .features.text_document.diagnostics import PublishDiagnosticReporter
 
 
 MethodName = str
@@ -75,7 +75,7 @@ class Session:
         self.working_documents: DocumentMap = {}
 
         # Diagnostic manager
-        self.diagnostic_manager = DiagnosticManager(kwargs.get("report_settings"))
+        self.diagnostic_manager = PublishDiagnosticReporter(kwargs.get("report_settings"))
 
     def get_document(
         self, view: View, /, default: Optional[Any] = None

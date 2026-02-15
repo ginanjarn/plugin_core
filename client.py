@@ -23,7 +23,6 @@ if TYPE_CHECKING:
 import sublime
 
 from .child_process import ChildProcess
-from .diagnostics import ReportSettings
 from .errors import transform_error
 from .message import (
     Message,
@@ -52,7 +51,7 @@ from .features.text_document.hover import DocumentHoverMixins
 from .features.text_document.formatting import DocumentFormattingMixins
 from .features.text_document.definition import DocumentDefinitionMixins
 from .features.text_document.rename import DocumentRenameMixins
-from .features.text_document.diagnostics import DocumentDiagnosticsMixins
+from .features.text_document.diagnostics import DocumentDiagnosticsMixins, ReportSettings
 from .features.text_document.symbol import DocumentSymbolMixins
 from .features.workspace.execute_command import WorkspaceExecuteCommandMixins
 from .features.workspace.apply_edit import WorkspaceApplyEditMixins
