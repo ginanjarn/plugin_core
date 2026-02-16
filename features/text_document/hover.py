@@ -49,7 +49,10 @@ class DocumentHoverMixins(Client):
             self.diagnostic_message = diagnostic_message
             if diagnostic_message:
                 self.show_hover_popup(
-                    view, diagnostic_message, self.hover_point, "markdown"
+                    view,
+                    diagnostic_message,
+                    self.hover_point,
+                    "markdown",
                 )
 
             self.hover_target = document
@@ -64,19 +67,28 @@ class DocumentHoverMixins(Client):
         if not result:
             return
 
+        contents = []
+        if self.diagnostic_message:
+            contents.append(self.diagnostic_message)
+
         text, markup = self._get_hover_content(result)
-        popup_content = "\n***\n".join([self.diagnostic_message, text])
+        contents.append(text)
+
+        hr_line = "\n***\n"
         self.show_hover_popup(
-            self.hover_target.view, popup_content, self.hover_point, markup
+            self.hover_target.view,
+            hr_line.join(contents),
+            self.hover_point,
+            markup,
         )
 
     def _get_hover_content(self, hover: Hover) -> tuple:
-        markup = "plaintext"
+        markup = "markdown"
         contents = hover["contents"]
 
         if isinstance(contents, dict):
             value = contents["value"]
-            markup = contents.get("kind", "plaintext")
+            markup = contents.get("kind", markup)
         elif isinstance(contents, str):
             value = contents
 
