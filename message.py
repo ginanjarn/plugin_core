@@ -57,7 +57,7 @@ def loads(json_str: Union[str, bytes]) -> Message:
     try:
         dct = json_loads(json_str)
     except JSONDecodeError as err:
-        raise ParseError from err
+        raise ParseError(str(err)) from err
 
     version = dct.pop(JSONRPC_KEY, "1.0")
     if version != JSONRPC_VERSION:

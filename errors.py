@@ -1,48 +1,49 @@
 """json-rpc errors"""
 
+from functools import partial
 from typing import Union, Dict, Any, Optional
 
 
 class JSONRPCException(Exception):
     """json-rpc exception base"""
 
-    def __init__(self, code: int, message: str, data: Optional[Any] = None) -> None:
+    def __init__(self, message: str, code: int, data: Optional[Any] = None) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
         self.data = data
 
 
-ParseError = JSONRPCException(code=-32700, message="parse error")
+ParseError = partial(JSONRPCException, code=-32700)
 """An error occurred while parsing the JSON text"""
 
-InvalidRequest = JSONRPCException(code=-32600, message="invalid request")
+InvalidRequest = partial(JSONRPCException, code=-32600)
 """The JSON sent is not a valid Request object"""
 
-MethodNotFound = JSONRPCException(code=-32601, message="method not found")
+MethodNotFound = partial(JSONRPCException, code=-32601)
 """The method does not exist / is not available"""
 
-InvalidParams = JSONRPCException(code=-32602, message="invalid params")
+InvalidParams = partial(JSONRPCException, code=-32602)
 """Invalid method parameter(s)"""
 
-InternalError = JSONRPCException(code=-32603, message="internal error")
+InternalError = partial(JSONRPCException, code=-32603)
 """Internal JSON-RPC error"""
 
-ServerNotInitialized = JSONRPCException(-32002, "server not initialized")
+ServerNotInitialized = partial(JSONRPCException, code=-32002)
 """Server received a notification or request before the server received the `initialize` request"""
 
-UnknownErrorCode = JSONRPCException(-32001, "")
+UnknownErrorCode = partial(JSONRPCException, code=-32001)
 
-RequestFailed = JSONRPCException(-32803, "request failed")
+RequestFailed = partial(JSONRPCException, code=-32803)
 """A request failed but it was syntactically correct"""
 
-ServerCancelled = JSONRPCException(-32802, "server cancelled")
+ServerCancelled = partial(JSONRPCException, code=-32802)
 """The server cancelled the request"""
 
-ContentModified = JSONRPCException(-32801, "content modified")
+ContentModified = partial(JSONRPCException, code=-32801)
 """The content of a document got modified outside normal conditions"""
 
-RequestCancelled = JSONRPCException(-32800, "request cancelled")
+RequestCancelled = partial(JSONRPCException, code=-32800)
 """The client has canceled a request and a server has detected the cancel"""
 
 
@@ -52,10 +53,10 @@ class ServerError(JSONRPCException):
     min_range = -32099
     max_range = -32000
 
-    def __init__(self, code: int, message: str, data: Optional[Any] = None) -> None:
+    def __init__(self, message: str, code: int, data: Optional[Any] = None) -> None:
         if not (self.min_range < code < self.max_range):
             raise ValueError(f"valid code {self.min_range} to {self.max_range}")
-        super().__init__(code, message, data)
+        super().__init__(message, code, data)
 
 
 def transform_error(
