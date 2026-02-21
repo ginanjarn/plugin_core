@@ -8,15 +8,10 @@ import sublime_plugin
 
 from ..session import InitializeStatus
 from ..uri import path_to_uri
-from ..lsprotocol.client import Client, InitializeResult
-
-
-class _InitializeCommand(sublime_plugin.TextCommand):
-
-    client = None
-
-    def run(self, edit: sublime.Edit):
-        self.client.initialize(self.view)
+from ..lsprotocol.client import (
+    Client as LSClient,
+    InitializeResult,
+)
 
 
 DEFAULT_PARAMS = {
@@ -320,7 +315,7 @@ DEFAULT_PARAMS = {
 }
 
 
-class InitializerMixins(Client):
+class InitializerMixins(LSClient):
 
     def initialize(self, view: sublime.View):
         # cancel if initializing
@@ -395,3 +390,11 @@ def get_workspace_path(view: sublime.View, return_parent: bool = True) -> str:
         return ""
 
     return str(Path(file_name).parent)
+
+
+class _InitializeCommand(sublime_plugin.TextCommand):
+
+    client: InitializerMixins = None
+
+    def run(self, edit: sublime.Edit):
+        self.client.initialize(self.view)

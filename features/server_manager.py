@@ -2,10 +2,12 @@ from typing import Optional
 import sublime
 import sublime_plugin
 
+from ..client import Client
+
 
 class _StartServerCommand(sublime_plugin.TextCommand):
 
-    client = None
+    client: Client = None
 
     def run(self, edit: sublime.Edit, envs: Optional[dict] = None):
         self.client.start_server(envs)
@@ -16,7 +18,7 @@ class _StartServerCommand(sublime_plugin.TextCommand):
 
 class _TerminateServerCommand(sublime_plugin.TextCommand):
 
-    client = None
+    client: Client = None
 
     def run(self, edit: sublime.Edit):
         self.client.terminate()
