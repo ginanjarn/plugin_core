@@ -59,15 +59,11 @@ class DocumentSymbolMixins(Client):
         if location := symbol.get("location"):
             file_name = uri_to_path(location["uri"])
             start = LineCharacter(**location["range"]["start"])
-            end = LineCharacter(**location["range"]["end"])
-            region = sublime.Region(view.text_point(*start), view.text_point(*end))
-            name = view.substr(region)
         else:
             file_name = view.file_name()
             start = LineCharacter(**symbol["range"]["start"])
-            end = LineCharacter(**symbol["range"]["end"])
-            name = symbol["name"]
 
+        name = symbol["name"]
         return Symbol(name, SymbolLocation(file_name, start[0], start[1]))
 
 
