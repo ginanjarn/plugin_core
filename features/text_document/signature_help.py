@@ -95,9 +95,6 @@ class _DocumentSignatureHelpCommand(sublime_plugin.TextCommand):
 
         point = self.view.sel()[0].begin()
         row, column = self.view.rowcol(point)
-        if not self.view.match_selector(point, "meta.function-call.arguments"):
-            return
-
         self.client.textdocument_signaturehelp(self.view, row, column)
 
 
