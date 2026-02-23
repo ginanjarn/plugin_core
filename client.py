@@ -51,8 +51,12 @@ from .features.text_document.hover import DocumentHoverMixins
 from .features.text_document.formatting import DocumentFormattingMixins
 from .features.text_document.definition import DocumentDefinitionMixins
 from .features.text_document.rename import DocumentRenameMixins
-from .features.text_document.diagnostics import DocumentDiagnosticsMixins, ReportSettings
+from .features.text_document.diagnostics import (
+    DocumentDiagnosticsMixins,
+    ReportSettings,
+)
 from .features.text_document.symbol import DocumentSymbolMixins
+from .features.text_document.code_action import DocumentCodeActionMixins
 from .features.workspace.execute_command import WorkspaceExecuteCommandMixins
 from .features.workspace.apply_edit import WorkspaceApplyEditMixins
 from .features.window.message import WindowMessageMixins
@@ -359,6 +363,7 @@ class Client(
     DocumentRenameMixins,
     DocumentSignatureHelpMixins,
     DocumentSymbolMixins,
+    DocumentCodeActionMixins,
     WorkspaceExecuteCommandMixins,
     WorkspaceApplyEditMixins,
     WindowMessageMixins,
