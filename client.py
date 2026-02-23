@@ -113,6 +113,9 @@ class ServerProcessManagerMixin:
     def __init__(self, *args, **kwargs) -> None:
         self.server_process: ChildProcess
 
+    def is_server_running(self) -> bool:
+        return self.server_process and self.server_process.is_running()
+
     def start_server(self, env: Optional[dict] = None) -> None:
         """"""
         # only one thread can run server
