@@ -4,7 +4,7 @@ from typing import Union
 import sublime
 import sublime_plugin
 
-from ....constant import COMMAND_PREFIX, LANGUAGE_ID
+from ....constant import LANGUAGE_ID
 from ...document import is_valid_document
 from ...uri import path_to_uri
 from ...lsprotocol.client import Client, SignatureHelp
@@ -99,15 +99,35 @@ class _DocumentSignatureHelpCommand(sublime_plugin.TextCommand):
 
 
 class DocumentSignatureHelpEventListener(sublime_plugin.EventListener):
-    client = None
+    client: DocumentSignatureHelpMixins = None
+    _trigger_characters = []
+    insert_commands = {"insert", "insert_snippet", "insert_completion"}
 
     @client_must_ready
-    def on_modified_async(self, view: sublime.View):
-        self.trigger_signature_help(view)
-
-    def trigger_signature_help(self, view: sublime.View):
+    def on_modified_async(self, view: sublime.View) -> None:
         if not is_valid_document(view):
             return
+
+        name, *_ = view.command_history(0)
+        if name not in self.insert_commands:
+            return
+
         point = view.sel()[0].begin()
-        if view.substr(point - 1) in {"(", ","}:
-            view.run_command(f"{COMMAND_PREFIX}_document_signature_help")
+        char = view.substr(point - 1)
+        if char in self.trigger_characters:
+            row, column = view.rowcol(point)
+            self.client.textdocument_signaturehelp(view, row, column)
+
+    @property
+    def trigger_characters(self) -> str:
+        if self._trigger_characters:
+            return self._trigger_characters
+
+        try:
+            capabilities = self.client.session.server_capabilities
+            chars = capabilities["signatureHelpProvider"]["triggerCharacters"]
+        except (KeyError, AttributeError):
+            chars = ["("]
+
+        self._trigger_characters = chars
+        return self._trigger_characters
