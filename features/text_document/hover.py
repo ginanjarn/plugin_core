@@ -117,7 +117,7 @@ class DocumentHoverMixins(Client):
     @staticmethod
     def _get_diagnostic_message(document: Document, row: int, col: int):
         items = [
-            ": ".join([d.get("code", ""), d["message"]])
+            " ".join([d.get("code", ""), d["message"]]).strip()
             for d in document.diagnostics
             if LineCharacter(**d["range"]["start"])
             <= LineCharacter(row, col)
