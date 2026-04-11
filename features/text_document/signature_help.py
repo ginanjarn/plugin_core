@@ -4,7 +4,6 @@ from typing import Union
 import sublime
 import sublime_plugin
 
-from ....constant import LANGUAGE_ID
 from ...document import is_valid_document
 from ...uri import path_to_uri
 from ...lsprotocol.client import Client, SignatureHelp
@@ -48,19 +47,24 @@ class DocumentSignatureHelpMixins(Client):
     ) -> None:
         if not result:
             return
+
+        contents = []
+        index = result.get("activeSignature", 0)
         signatures = result["signatures"]
         if not signatures:
             return
 
-        content = "".join(
-            [
-                f"```{LANGUAGE_ID}\n",
-                "\n".join([s["label"] for s in signatures]),
-                "\n```",
-            ]
-        )
+        signature = signatures[index]
+        contents.append(f'```\n{signature["label"]}\n```')
+        if doc := signature.get("documentation"):
+            if isinstance(doc, str):
+                contents.append(doc)
+            elif value := doc.get("value"):
+                contents.append(value)
+
         view = self.signature_help_target.view
         location = view.sel()[0].a
+        content = "\n\n".join(contents)
         self.show_signature_popup(view, content, location, "markdown")
 
     @staticmethod
