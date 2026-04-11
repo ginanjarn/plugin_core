@@ -59,6 +59,7 @@ class ChildProcess:
 
         self.process: subprocess.Popen = None
         self._run_event = threading.Event()
+        self._run_lock = threading.Lock()
 
         # Prevent run process until termination done
         self._terminate_event = threading.Event()
@@ -75,31 +76,35 @@ class ChildProcess:
     def run(self, env: Optional[dict] = None) -> None:
         """Run process"""
 
-        # Wait if in termination process
-        self._terminate_event.wait()
-
-        # Prevent process reassignment
-        if self.process and self.process.poll() is None:
+        if self._run_lock.locked():
             return
 
-        print("execute '%s'" % shlex.join(self.command))
+        with self._run_lock:
+            # Wait if in termination process
+            self._terminate_event.wait()
 
-        self.process = subprocess.Popen(
-            self.command,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=env or None,
-            cwd=self.cwd or None,
-            bufsize=0,
-            startupinfo=STARTUPINFO,
-        )
+            # Prevent process reassignment
+            if self.process and self.process.poll() is None:
+                return
 
-        # Ready to call 'Popen()' object
-        self._run_event.set()
+            print("execute '%s'" % shlex.join(self.command))
 
-        thread = threading.Thread(target=self._listen_stderr_task)
-        thread.start()
+            self.process = subprocess.Popen(
+                self.command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env or None,
+                cwd=self.cwd or None,
+                bufsize=0,
+                startupinfo=STARTUPINFO,
+            )
+
+            # Ready to call 'Popen()' object
+            self._run_event.set()
+
+            thread = threading.Thread(target=self._listen_stderr_task)
+            thread.start()
 
     @property
     @recover_exception(BytesIO)
