@@ -64,6 +64,7 @@ class ChildProcess:
         # Prevent run process until termination done
         self._terminate_event = threading.Event()
         self._terminate_event.set()
+        self._terminate_lock = threading.Lock()
 
     def is_running(self) -> bool:
         """If process is running"""
@@ -132,14 +133,18 @@ class ChildProcess:
     def terminate(self) -> None:
         """Terminate process"""
 
-        self._terminate_event.clear()
-        self._run_event.clear()
-
-        if not self.process:
+        if self._terminate_lock.locked():
             return
 
-        self.process.terminate()
-        return_code = self.process.wait()
-        print("process terminated with exit code", return_code)
-        # Set to None to release 'Popen()' object from memory
-        self.process = None
+        with self._terminate_lock:
+            self._terminate_event.clear()
+            self._run_event.clear()
+
+            if not self.process:
+                return
+
+            self.process.terminate()
+            return_code = self.process.wait()
+            print("process terminated with exit code", return_code)
+            # Set to None to release 'Popen()' object from memory
+            self.process = None
