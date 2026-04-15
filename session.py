@@ -62,6 +62,10 @@ class DocumentMap(MutableMapping):
     def __iter__(self) -> Iterator[View]:
         yield from iter(self.data)
 
+    @lock
+    def __len__(self) -> int:
+        return len(self.data)
+
 
 class Session:
     """Session Base class"""
@@ -72,7 +76,7 @@ class Session:
         self.initialize_status = InitializeStatus.NotInitialized
 
         self.workspace_path: PathStr = ""
-        self.working_documents: DocumentMap = {}
+        self.working_documents = DocumentMap()
 
         # Diagnostic manager
         self.diagnostic_manager = PublishDiagnosticReporter(kwargs.get("report_settings"))
