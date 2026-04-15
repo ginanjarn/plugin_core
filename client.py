@@ -79,7 +79,7 @@ class Context(MutableMapping):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
             with self._lock:
-                return func(*args, **kwargs)
+                return func(self, *args, **kwargs)
 
         return wrapper
 
