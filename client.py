@@ -147,23 +147,32 @@ class RequestManager:
 
         self._lock = threading.Lock()
 
-    def reset(self):
-        with self._lock:
-            self.methods_map.clear()
-            self.request_count = 0
+    def lock(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with self._lock:
+                return func(self, *args, **kwargs)
 
+        return wrapper
+
+    @lock
+    def reset(self) -> None:
+        self.methods_map.clear()
+        self.request_count = 0
+
+    @lock
     def add(self, method: Method) -> int:
         """add request method to request_map
 
         Return:
             request_count: int
         """
-        with self._lock:
-            self.request_count += 1
-            self.methods_map[self.request_count] = method
+        self.request_count += 1
+        self.methods_map[self.request_count] = method
 
-            return self.request_count
+        return self.request_count
 
+    @lock
     def pop(self, request_id: int) -> Method:
         """pop method paired with request_id
 
@@ -172,21 +181,17 @@ class RequestManager:
         Raises:
             KeyError if request_id not found
         """
+        return self.methods_map.pop(request_id)
 
-        with self._lock:
-            return self.methods_map.pop(request_id)
-
+    @lock
     def is_pending_request(self, method: Method) -> bool:
         """check if same method has pending request"""
+        return method in self.methods_map
 
-        with self._lock:
-            return method in self.methods_map
-
+    @lock
     def cancel_all(self):
         """cancel all request"""
-
-        with self._lock:
-            self.methods_map.clear()
+        self.methods_map.clear()
 
 
 class _MessageExchangeBase:
