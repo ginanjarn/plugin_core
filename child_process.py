@@ -58,13 +58,10 @@ class ChildProcess:
         self.cwd = cwd
 
         self.process: subprocess.Popen = None
+        # lock for run() and terminate() call
+        self._switch_lock = threading.Lock()
         self._run_event = threading.Event()
-        self._run_lock = threading.Lock()
-
-        # Prevent run process until termination done
-        self._terminate_event = threading.Event()
-        self._terminate_event.set()
-        self._terminate_lock = threading.Lock()
+        self._terminate_process_event = threading.Event()
 
     def is_running(self) -> bool:
         """If process is running"""
@@ -77,13 +74,10 @@ class ChildProcess:
     def run(self, env: Optional[dict] = None) -> None:
         """Run process"""
 
-        if self._run_lock.locked():
+        if self._switch_lock.locked():
             return
 
-        with self._run_lock:
-            # Wait if in termination process
-            self._terminate_event.wait()
-
+        with self._switch_lock:
             # Prevent process reassignment
             if self.process and self.process.poll() is None:
                 return
@@ -128,16 +122,16 @@ class ChildProcess:
             print(prefix, bline.rstrip().decode())
 
         # Stderr return empty character, process is terminated
-        self._terminate_event.set()
+        self._terminate_process_event.set()
 
     def terminate(self) -> None:
         """Terminate process"""
 
-        if self._terminate_lock.locked():
+        if self._switch_lock.locked():
             return
 
-        with self._terminate_lock:
-            self._terminate_event.clear()
+        with self._switch_lock:
+            self._terminate_process_event.clear()
             self._run_event.clear()
 
             if not self.process:
@@ -146,5 +140,8 @@ class ChildProcess:
             self.process.terminate()
             return_code = self.process.wait()
             print("process terminated with exit code", return_code)
+
+            # wait until stderr closed
+            self._terminate_process_event.wait()
             # Set to None to release 'Popen()' object from memory
             self.process = None
