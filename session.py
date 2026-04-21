@@ -3,6 +3,7 @@
 import logging
 import threading
 from collections.abc import MutableMapping
+from dataclasses import dataclass
 from functools import wraps
 from enum import Enum
 from typing import Optional, List, Any, Callable, Iterator
@@ -13,8 +14,6 @@ from ..constant import LOGGING_CHANNEL
 from .document import Document
 from .features.text_document.diagnostics import PublishDiagnosticReporter
 
-
-MethodName = str
 PathStr = str
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
@@ -68,6 +67,13 @@ class DocumentMap(MutableMapping):
         return len(self.data)
 
 
+@dataclass
+class Workspace:
+    rootPath: PathStr
+    configurations: dict = None
+    diagnostics: dict = None
+
+
 class Session:
     """Session Base class"""
 
@@ -76,8 +82,8 @@ class Session:
         self.server_capabilities: dict = {}
         self.connection_status = ConnectionStatus.NotSet
 
-        self.workspace_path: PathStr = ""
-        self.working_documents = DocumentMap()
+        self.workspace_folders: List[Workspace] = []
+        self.opened_documents = DocumentMap()
 
         # Diagnostic manager
         self.diagnostic_manager = PublishDiagnosticReporter(
@@ -88,24 +94,24 @@ class Session:
         self, view: View, /, default: Optional[Any] = None
     ) -> Optional[Document]:
         try:
-            return self.working_documents[view]
+            return self.opened_documents[view]
         except KeyError:
             return default
 
     def get_document_with_name(
         self, file_name: PathStr, /, default: Optional[Any] = None
     ) -> Optional[Document]:
-        for _, document in self.working_documents.items():
+        for _, document in self.opened_documents.items():
             if document.file_name == file_name:
                 return document
         return default
 
     def add_document(self, document: Document) -> None:
-        self.working_documents[document.view] = document
+        self.opened_documents[document.view] = document
 
     def remove_document(self, view: View) -> None:
         try:
-            del self.working_documents[view]
+            del self.opened_documents[view]
         except KeyError as err:
             LOGGER.debug("document not found %s", err)
 
@@ -115,14 +121,14 @@ class Session:
         """get documents."""
 
         if not filter_func:
-            return [doc for _, doc in self.working_documents.items()]
-        return [doc for _, doc in self.working_documents.items() if filter_func(doc)]
+            return [doc for _, doc in self.opened_documents.items()]
+        return [doc for _, doc in self.opened_documents.items() if filter_func(doc)]
 
     def is_initialized(self):
         return self.connection_status is ConnectionStatus.Initialized
 
     def reset(self):
         """"""
-        self.working_documents.clear()
+        self.opened_documents.clear()
         self.diagnostic_manager.reset()
         self.connection_status = ConnectionStatus.NotSet

@@ -6,7 +6,7 @@ from uuid import uuid4
 import sublime
 import sublime_plugin
 
-from ..session import ConnectionStatus
+from ..session import ConnectionStatus, Workspace
 from ..uri import path_to_uri
 from ..lsprotocol.client import (
     Client as LSClient,
@@ -330,7 +330,7 @@ class InitializerMixins(LSClient):
         workspace_path = get_workspace_path(view)
         if not workspace_path:
             return
-        self.session.workspace_path = workspace_path
+        self.session.workspace_folders = [Workspace(workspace_path)]
 
         params = DEFAULT_PARAMS.copy()
         params["rootPath"] = workspace_path
