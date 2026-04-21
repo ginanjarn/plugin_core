@@ -19,10 +19,11 @@ PathStr = str
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
 
-class InitializeStatus(Enum):
-    NotInitialized = 0
-    Initializing = 1
+class ConnectionStatus(Enum):
+    NotSet = 0
+    Connecting = 1
     Initialized = 2
+    Shutdown = 3
 
 
 class DocumentMap(MutableMapping):
@@ -73,13 +74,15 @@ class Session:
     def __init__(self, **kwargs) -> None:
         self.client_capabilities: dict = {}
         self.server_capabilities: dict = {}
-        self.initialize_status = InitializeStatus.NotInitialized
+        self.connection_status = ConnectionStatus.NotSet
 
         self.workspace_path: PathStr = ""
         self.working_documents = DocumentMap()
 
         # Diagnostic manager
-        self.diagnostic_manager = PublishDiagnosticReporter(kwargs.get("report_settings"))
+        self.diagnostic_manager = PublishDiagnosticReporter(
+            kwargs.get("report_settings")
+        )
 
     def get_document(
         self, view: View, /, default: Optional[Any] = None
@@ -116,10 +119,10 @@ class Session:
         return [doc for _, doc in self.working_documents.items() if filter_func(doc)]
 
     def is_initialized(self):
-        return self.initialize_status is InitializeStatus.Initialized
+        return self.connection_status is ConnectionStatus.Initialized
 
     def reset(self):
         """"""
         self.working_documents.clear()
         self.diagnostic_manager.reset()
-        self.initialize_status = InitializeStatus.NotInitialized
+        self.connection_status = ConnectionStatus.NotSet

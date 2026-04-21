@@ -6,7 +6,7 @@ from uuid import uuid4
 import sublime
 import sublime_plugin
 
-from ..session import InitializeStatus
+from ..session import ConnectionStatus
 from ..uri import path_to_uri
 from ..lsprotocol.client import (
     Client as LSClient,
@@ -319,9 +319,9 @@ class InitializerMixins(LSClient):
 
     def initialize(self, view: sublime.View):
         # cancel if initializing
-        if self.session.initialize_status is InitializeStatus.Initializing:
+        if self.session.connection_status is ConnectionStatus.Connecting:
             return
-        self.session.initialize_status = InitializeStatus.Initializing
+        self.session.connection_status = ConnectionStatus.Connecting
 
         # check if view not closed
         if view is None:
@@ -361,7 +361,7 @@ class InitializerMixins(LSClient):
 
     def initialized(self):
         self.initialized_notification({})
-        self.session.initialize_status = InitializeStatus.Initialized
+        self.session.connection_status = ConnectionStatus.Initialized
 
 
 def get_workspace_path(view: sublime.View, return_parent: bool = True) -> str:
