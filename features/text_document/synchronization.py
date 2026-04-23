@@ -32,8 +32,8 @@ class DocumentSynchronizerMixins(Client):
         # check if view not closed
         if not (view and view.is_valid()):
             return
-
-        self.session.diagnostic_manager.set_active_view(view)
+        # show diagnostic report
+        self.session.diagnostic_reporter.show(view)
 
         # Check if document has opened
         if self.session.get_document(view):
@@ -83,6 +83,9 @@ class DocumentSynchronizerMixins(Client):
         capabilities = self.session.server_capabilities.get("textDocumentSync", {})
         if not capabilities.get("openClose", False):
             return
+
+        # delete diagnostic report
+        self.session.diagnostic_reporter.delete(view)
 
         # Check if the document open in multiple view like side-by-side layout
         documents = self.session.get_documents(

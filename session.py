@@ -12,7 +12,7 @@ from sublime import View
 
 from ..constant import LOGGING_CHANNEL
 from .document import Document
-from .features.text_document.diagnostics import PublishDiagnosticReporter
+from .diagnostic_reporter import ReportManager as DiagnosticReportManager
 
 PathStr = str
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
@@ -86,9 +86,7 @@ class Session:
         self.opened_documents = DocumentMap()
 
         # Diagnostic manager
-        self.diagnostic_manager = PublishDiagnosticReporter(
-            kwargs.get("report_settings")
-        )
+        self.diagnostic_reporter = DiagnosticReportManager(kwargs.get("report_settings"))
 
     def get_document(
         self, view: View, /, default: Optional[Any] = None
@@ -130,5 +128,5 @@ class Session:
     def reset(self):
         """"""
         self.opened_documents.clear()
-        self.diagnostic_manager.reset()
+        self.diagnostic_reporter.reset()
         self.connection_status = ConnectionStatus.NotSet

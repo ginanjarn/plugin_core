@@ -41,6 +41,7 @@ from .lsprotocol.client import (
     LSPAny,
 )
 from .transport import Transport
+from .diagnostic_reporter import Settings as ReporterSettings
 from ..constant import LOGGING_CHANNEL
 
 from .features.initializer import InitializerMixins
@@ -51,10 +52,7 @@ from .features.text_document.hover import DocumentHoverMixins
 from .features.text_document.formatting import DocumentFormattingMixins
 from .features.text_document.definition import DocumentDefinitionMixins
 from .features.text_document.rename import DocumentRenameMixins
-from .features.text_document.diagnostics import (
-    DocumentDiagnosticsMixins,
-    ReportSettings,
-)
+from .features.text_document.diagnostics import DocumentDiagnosticsMixins
 from .features.text_document.symbol import DocumentSymbolMixins
 from .features.text_document.code_action import DocumentCodeActionMixins
 from .features.workspace.execute_command import WorkspaceExecuteCommandMixins
@@ -340,7 +338,7 @@ class BaseClient(LSPMessageExchangeManager, ServerProcessManagerMixin):
         self,
         process: ChildProcess,
         transport: Transport,
-        report_settings: ReportSettings = None,
+        report_settings: ReporterSettings = None,
     ):
 
         self.server_process = process
