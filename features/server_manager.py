@@ -13,6 +13,8 @@ class _StartServerCommand(sublime_plugin.TextCommand):
         self.client.start_server(envs)
 
     def is_visible(self):
+        if not self.client:
+            return False
         return not self.client.is_ready()
 
 
@@ -24,4 +26,6 @@ class _TerminateServerCommand(sublime_plugin.TextCommand):
         self.client.terminate()
 
     def is_visible(self):
-        return self.client.is_ready()
+        if not self.client:
+            return False
+        return self.client.is_server_running()
