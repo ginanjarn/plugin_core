@@ -36,10 +36,7 @@ from .message import (
     dumps,
 )
 from .session import Session
-from .lsprotocol.client import (
-    Client as LSClient,
-    LSPAny,
-)
+from .lsprotocol.client import Client as LSClient
 from .transport import Transport
 from .diagnostic_reporter import Settings as ReporterSettings
 from ..constant import LOGGING_CHANNEL
@@ -104,7 +101,7 @@ ResponseHandler = Callable[[Context, Response], None]
 SessionMessageHandler = Union[RequestHandler, NotificationHandler, ResponseHandler]
 
 
-class ServerProcessManagerMixin:
+class ProcessManager:
 
     _start_server_lock = threading.Lock()
 
@@ -201,14 +198,21 @@ class _MessageExchangeBase:
     def _reset_managers(self) -> None:
         self._request_manager.reset()
 
-    def send_message(self, message: Message) -> None:
+    def send(self, message: Message) -> None:
         """send message"""
         content = dumps(message, as_bytes=True)
         self.transport.write(content)
 
-    def recv_message(self) -> Message:
+    def recv(self) -> Message:
+        """recv message"""
         content = self.transport.read()
         return loads(content)
+
+    def _handle(
+        self, context: Context, method: Method, param_or_result: Optional[Any] = None
+    ) -> Optional[Result]:
+        """handle command"""
+        raise NotImplementedError("_handle")
 
     def listen(self) -> None:
         """listen message"""
@@ -221,14 +225,14 @@ class _MessageExchangeBase:
 class ClientCommand(_MessageExchangeBase):
     """Client command interface"""
 
-    def send_request(self, method: Method, params: Params) -> None:
+    def request(self, method: Method, params: Params) -> None:
         # cancel pending request
         if self._request_manager.is_pending_request(method):
             pending_id = self._request_manager.pop(method)
-            self.send_notification("$/cancelRequest", {"id": pending_id})
+            self.notify("$/cancelRequest", {"id": pending_id})
 
         req_id = self._request_manager.add(method)
-        self.send_message(Request(req_id, method, params))
+        self.send(Request(req_id, method, params))
 
     def _handle_response(self, context: Context, response: Response) -> None:
         try:
@@ -242,18 +246,18 @@ class ClientCommand(_MessageExchangeBase):
             return
 
         try:
-            self.handle_command(context, method, response.result)
+            self._handle(context, method, response.result)
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
 
-    def send_notification(self, method: Method, params: Params) -> None:
+    def notify(self, method: Method, params: Params) -> None:
         if method in {
             "textDocument/didOpen",
             "textDocument/didChange",
         }:
             # cancel all current request
             self._request_manager.cancel_all()
-        self.send_message(Notification(method, params))
+        self.send(Notification(method, params))
 
 
 class ServerCommand(_MessageExchangeBase):
@@ -263,28 +267,28 @@ class ServerCommand(_MessageExchangeBase):
         result = None
         error = None
         try:
-            result = self.handle_command(context, request.method, request.params)
+            result = self._handle(context, request.method, request.params)
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
             error = transform_error(err)
 
-        self._send_response(request.id, result, error)
+        self._respond(request.id, result, error)
 
-    def _send_response(
+    def _respond(
         self, id: int, result: Optional[Any] = None, error: Optional[dict] = None
     ) -> None:
-        self.send_message(Response(id, result, error))
+        self.send(Response(id, result, error))
 
     def _handle_notification(
         self, context: Context, notification: Notification
     ) -> None:
         try:
-            self.handle_command(context, notification.method, notification.params)
+            self._handle(context, notification.method, notification.params)
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
 
 
-class ListenTaskImpl(_MessageExchangeBase):
+class TaskImplementation(_MessageExchangeBase, LSClient):
 
     def _listen_task(self) -> None:
         handler_map = {
@@ -295,7 +299,7 @@ class ListenTaskImpl(_MessageExchangeBase):
 
         while True:
             try:
-                message = self.recv_message()
+                message = self.recv()
                 typ = type(message)
                 handler_map[typ](self.session, message)
 
@@ -309,29 +313,17 @@ class ListenTaskImpl(_MessageExchangeBase):
         # terminated
         self.terminate()
 
-
-class MessageExchangeMixin(ListenTaskImpl, ClientCommand, ServerCommand):
-    """Client - Server Message Manager"""
-
-
-class LSPMessageExchangeManager(LSClient, MessageExchangeMixin):
-    def request(self, method: str, params: LSPAny) -> None:
-        self.send_request(method, params)
-
-    def notify(self, method: str, params: LSPAny) -> None:
-        self.send_notification(method, params)
-
-    def handle_command(
-        self,
-        context: Context,
-        method: Method,
-        param_or_result: Union[Params, Result],
-    ) -> Optional[Any]:
-        """"""
+    def _handle(
+        self, context: Context, method: Method, param_or_result: Optional[Any] = None
+    ) -> Optional[Result]:
         return self.handle(context, method, param_or_result)
 
 
-class BaseClient(LSPMessageExchangeManager, ServerProcessManagerMixin):
+class RPC(TaskImplementation, ClientCommand, ServerCommand):
+    """Remote Procedure Call"""
+
+
+class BaseClient(RPC, ProcessManager):
     """"""
 
     def __init__(
