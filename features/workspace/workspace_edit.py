@@ -1,5 +1,5 @@
 from collections import namedtuple
-from dataclasses import  asdict
+from dataclasses import asdict
 from pathlib import Path
 from typing import List, Dict, Union
 
@@ -149,4 +149,3 @@ class TextFile:
             temp = f"{temp[:start_offset]}{change.text}{temp[end_offset:]}"
 
         return temp
-

@@ -86,7 +86,9 @@ class Session:
         self.opened_documents = DocumentMap()
 
         # Diagnostic manager
-        self.diagnostic_reporter = DiagnosticReportManager(kwargs.get("report_settings"))
+        self.diagnostic_reporter = DiagnosticReportManager(
+            kwargs.get("report_settings")
+        )
 
     def get_document(
         self, view: View, /, default: Optional[Any] = None
