@@ -136,16 +136,6 @@ class DocumentCompletionMixins(BaseClient):
         )
 
 
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
-
-
 class CompletionEventListener(sublime_plugin.EventListener):
     client: DocumentCompletionMixins = None
 
@@ -153,7 +143,6 @@ class CompletionEventListener(sublime_plugin.EventListener):
         super().__init__(*args, **kwargs)
         self.prev_trigger_location = 0
 
-    @client_must_ready
     def on_query_completions(
         self, view: sublime.View, prefix: str, locations: List[int]
     ) -> sublime.CompletionList:

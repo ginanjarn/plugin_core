@@ -9,21 +9,8 @@ from ...uri import path_to_uri
 from ...lsprotocol.lsprotocol import TextDocumentContentChangePartial
 
 
-def must_initialized(func):
-    """exec if initialized"""
-
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if not self.session.is_initialized():
-            return None
-        return func(self, *args, **kwargs)
-
-    return wrapper
-
-
 class DocumentSynchronizerMixins(BaseClient):
 
-    @must_initialized
     def textdocument_didopen(self, view: sublime.View, *, reload: bool = False):
         capabilities = self.session.server_capabilities.get("textDocumentSync", {})
         if not capabilities.get("openClose", False):
@@ -63,7 +50,6 @@ class DocumentSynchronizerMixins(BaseClient):
         # Add current document
         self.session.add_document(document)
 
-    @must_initialized
     def textdocument_didsave(self, view: sublime.View):
         capabilities = self.session.server_capabilities.get("textDocumentSync", {})
         if not capabilities.get("save", False):
@@ -78,7 +64,6 @@ class DocumentSynchronizerMixins(BaseClient):
             # untitled document not yet loaded to server
             self.textdocument_didopen(view)
 
-    @must_initialized
     def textdocument_didclose(self, view: sublime.View):
         capabilities = self.session.server_capabilities.get("textDocumentSync", {})
         if not capabilities.get("openClose", False):
@@ -103,7 +88,6 @@ class DocumentSynchronizerMixins(BaseClient):
 
         self.session.remove_document(view)
 
-    @must_initialized
     def textdocument_didchange(
         self, view: sublime.View, changes: List[sublime.TextChange]
     ):

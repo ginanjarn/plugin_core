@@ -10,23 +10,10 @@ from ...uri import path_to_uri
 from ...lsprotocol.client import TextEdit
 
 
-def must_initialized(func):
-    """exec if initialized"""
-
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if not self.session.is_initialized():
-            return None
-        return func(self, *args, **kwargs)
-
-    return wrapper
-
-
 class DocumentFormattingMixins(BaseClient):
 
     formatting_target = None
 
-    @must_initialized
     def textdocument_formatting(self, view: sublime.View):
         if not self.session.server_capabilities.get(
             "documentFormattingProvider", False

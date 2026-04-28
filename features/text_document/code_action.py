@@ -10,23 +10,10 @@ from ...features.workspace.workspace_edit import WorkspaceEdit
 from ...lsprotocol.client import Command, CodeAction
 
 
-def must_initialized(func):
-    """exec if initialized"""
-
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if not self.session.is_initialized():
-            return None
-        return func(self, *args, **kwargs)
-
-    return wrapper
-
-
 class DocumentCodeActionMixins(BaseClient):
 
     code_action_target = None
 
-    @must_initialized
     def textdocument_codeaction(
         self,
         view: sublime.View,
@@ -95,7 +82,6 @@ class DocumentCodeActionMixins(BaseClient):
         else:
             self.codeaction_resolve(action)
 
-    @must_initialized
     def codeaction_resolve(self, params: CodeAction):
         self.code_action_resolve_request(params)
 

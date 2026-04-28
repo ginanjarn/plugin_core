@@ -15,23 +15,10 @@ from ....constant import COMMAND_PREFIX
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
 
-def must_initialized(func):
-    """exec if initialized"""
-
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if not self.session.is_initialized():
-            return None
-        return func(self, *args, **kwargs)
-
-    return wrapper
-
-
 class DocumentRenameMixins(BaseClient):
 
     rename_target = None
 
-    @must_initialized
     def textdocument_preparerename(self, view: sublime.View, row: int, col: int):
         if not self.session.server_capabilities.get("renameProvider", False):
             return
@@ -78,7 +65,6 @@ class DocumentRenameMixins(BaseClient):
             on_cancel=None,
         )
 
-    @must_initialized
     def textdocument_rename(
         self, view: sublime.View, row: int, col: int, new_name: str
     ):

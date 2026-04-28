@@ -16,23 +16,10 @@ SymbolLocation = namedtuple("SymbolLocation", ["file_name", "row", "column"])
 Symbol = namedtuple("Symbol", ["name", "location"])
 
 
-def must_initialized(func):
-    """exec if initialized"""
-
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if not self.session.is_initialized():
-            return None
-        return func(self, *args, **kwargs)
-
-    return wrapper
-
-
 class DocumentSymbolMixins(BaseClient):
 
     symbol_target = None
 
-    @must_initialized
     def textdocument_symbol(self, view: sublime.View):
         if not self.session.server_capabilities.get("documentSymbolProvider", False):
             return

@@ -15,23 +15,10 @@ PathEncodedStr = str
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
 
-def must_initialized(func):
-    """exec if initialized"""
-
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if not self.session.is_initialized():
-            return None
-        return func(self, *args, **kwargs)
-
-    return wrapper
-
-
 class DocumentDefinitionMixins(BaseClient):
 
     definition_target = None
 
-    @must_initialized
     def textdocument_definition(self, view: sublime.View, row: int, col: int):
         if not self.session.server_capabilities.get("definitionProvider", False):
             return

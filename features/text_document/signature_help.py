@@ -13,23 +13,10 @@ from ...lsprotocol.client import SignatureHelp
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
 
-def must_initialized(func):
-    """exec if initialized"""
-
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if not self.session.is_initialized():
-            return None
-        return func(self, *args, **kwargs)
-
-    return wrapper
-
-
 class DocumentSignatureHelpMixins(BaseClient):
 
     signature_help_target = None
 
-    @must_initialized
     def textdocument_signaturehelp(self, view: sublime.View, row: int, col: int):
         capabilities = self.session.server_capabilities.get("signatureHelpProvider", {})
         if not capabilities:
