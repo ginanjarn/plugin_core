@@ -3,10 +3,11 @@ from typing import List, Union
 import sublime
 import sublime_plugin
 
+from ...client_internal import BaseClient
 from ...document import is_valid_document
 from ...features.workspace.workspace_edit import WorkspaceEdit
 from ...uri import path_to_uri
-from ...lsprotocol.client import Client, TextEdit
+from ...lsprotocol.client import TextEdit
 
 
 def must_initialized(func):
@@ -21,13 +22,15 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentFormattingMixins(Client):
+class DocumentFormattingMixins(BaseClient):
 
     formatting_target = None
 
     @must_initialized
     def textdocument_formatting(self, view: sublime.View):
-        if not self.session.server_capabilities.get("documentFormattingProvider", False):
+        if not self.session.server_capabilities.get(
+            "documentFormattingProvider", False
+        ):
             return
         if document := self.session.get_document(view):
             self.formatting_target = document

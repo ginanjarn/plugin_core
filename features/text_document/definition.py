@@ -4,9 +4,10 @@ from typing import Optional, List, Union
 import sublime
 import sublime_plugin
 
+from ...client_internal import BaseClient
 from ...document import is_valid_document
 from ...uri import path_to_uri, uri_to_path
-from ...lsprotocol.client import Client, Definition, Location, DefinitionLink
+from ...lsprotocol.client import Definition, Location, DefinitionLink
 
 
 PathEncodedStr = str
@@ -26,7 +27,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentDefinitionMixins(Client):
+class DocumentDefinitionMixins(BaseClient):
 
     definition_target = None
 

@@ -3,10 +3,11 @@ from typing import List, Optional, Union
 import sublime
 import sublime_plugin
 
+from ...client_internal import BaseClient
 from ...document import is_valid_document
 from ...uri import path_to_uri
 from ...features.workspace.workspace_edit import WorkspaceEdit
-from ...lsprotocol.client import Client, Command, CodeAction
+from ...lsprotocol.client import Command, CodeAction
 
 
 def must_initialized(func):
@@ -21,7 +22,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentCodeActionMixins(Client):
+class DocumentCodeActionMixins(BaseClient):
 
     code_action_target = None
 

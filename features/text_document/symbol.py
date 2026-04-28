@@ -4,9 +4,10 @@ from typing import List, Union
 import sublime
 import sublime_plugin
 
+from ...client_internal import BaseClient
 from ...document import is_valid_document
 from ...uri import path_to_uri, uri_to_path
-from ...lsprotocol.client import Client, SymbolInformation, DocumentSymbol
+from ...lsprotocol.client import SymbolInformation, DocumentSymbol
 
 
 PathEncodedStr = str
@@ -27,7 +28,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentSymbolMixins(Client):
+class DocumentSymbolMixins(BaseClient):
 
     symbol_target = None
 

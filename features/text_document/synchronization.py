@@ -3,9 +3,9 @@ from typing import List
 import sublime
 import sublime_plugin
 
+from ...client_internal import BaseClient
 from ...document import Document, is_valid_document
 from ...uri import path_to_uri
-from ...lsprotocol.client import Client
 from ...lsprotocol.lsprotocol import TextDocumentContentChangePartial
 
 
@@ -21,7 +21,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentSynchronizerMixins(Client):
+class DocumentSynchronizerMixins(BaseClient):
 
     @must_initialized
     def textdocument_didopen(self, view: sublime.View, *, reload: bool = False):

@@ -1,8 +1,9 @@
 import sublime
-from ...lsprotocol.client import Client, LogMessageParams, ShowMessageParams
+from ...client_internal import BaseClient
+from ...lsprotocol.client import LogMessageParams, ShowMessageParams
 
 
-class WindowMessageMixins(Client):
+class WindowMessageMixins(BaseClient):
 
     def handle_log_message_notification(
         self, context: dict, params: LogMessageParams

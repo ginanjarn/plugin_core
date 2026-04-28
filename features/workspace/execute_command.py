@@ -3,8 +3,9 @@ from typing import Union
 import logging
 import sublime_plugin
 
+from ...client_internal import BaseClient
+from ...lsprotocol.client import LSPAny
 from ....constant import LOGGING_CHANNEL
-from ...lsprotocol.client import Client, LSPAny
 
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
@@ -21,7 +22,7 @@ def must_initialized(func):
     return wrapper
 
 
-class WorkspaceExecuteCommandMixins(Client):
+class WorkspaceExecuteCommandMixins(BaseClient):
 
     def workspace_executecommand(self, commands: dict):
         self.execute_command_request(commands)

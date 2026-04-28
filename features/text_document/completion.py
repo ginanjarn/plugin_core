@@ -5,9 +5,10 @@ from typing import List, Union
 import sublime
 import sublime_plugin
 
+from ...client_internal import BaseClient
 from ...document import is_valid_document
 from ...uri import path_to_uri
-from ...lsprotocol.client import Client, CompletionList, CompletionItem
+from ...lsprotocol.client import CompletionList, CompletionItem
 
 
 class _Empty:
@@ -60,7 +61,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentCompletionMixins(Client):
+class DocumentCompletionMixins(BaseClient):
 
     AUTO_COMPLETE_ARGUMENTS = {
         "disable_auto_insert": True,

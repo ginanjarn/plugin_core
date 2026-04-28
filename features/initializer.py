@@ -6,12 +6,10 @@ from uuid import uuid4
 import sublime
 import sublime_plugin
 
+from ..client_internal import BaseClient
 from ..session import ConnectionStatus, Workspace
 from ..uri import path_to_uri
-from ..lsprotocol.client import (
-    Client as LSClient,
-    InitializeResult,
-)
+from ..lsprotocol.client import InitializeResult
 
 
 DEFAULT_PARAMS = {
@@ -315,7 +313,7 @@ DEFAULT_PARAMS = {
 }
 
 
-class InitializerMixins(LSClient):
+class InitializerMixins(BaseClient):
 
     def initialize(self, view: sublime.View):
         # cancel if initializing

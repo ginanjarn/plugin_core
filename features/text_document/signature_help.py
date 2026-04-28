@@ -4,9 +4,10 @@ from typing import Union
 import sublime
 import sublime_plugin
 
+from ...client_internal import BaseClient
 from ...document import is_valid_document
 from ...uri import path_to_uri
-from ...lsprotocol.client import Client, SignatureHelp
+from ...lsprotocol.client import SignatureHelp
 
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
@@ -24,7 +25,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentSignatureHelpMixins(Client):
+class DocumentSignatureHelpMixins(BaseClient):
 
     signature_help_target = None
 

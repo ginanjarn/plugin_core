@@ -4,10 +4,11 @@ from typing import Optional, Union
 import sublime
 import sublime_plugin
 
+from ...client_internal import BaseClient
 from ...document import is_valid_document
 from ...uri import path_to_uri
 from ...features.workspace.workspace_edit import WorkspaceEdit
-from ...lsprotocol.client import Client, PrepareRenameResult, WorkspaceEdit as LspWorkspaceEdit
+from ...lsprotocol.client import PrepareRenameResult, WorkspaceEdit as LspWorkspaceEdit
 from ....constant import COMMAND_PREFIX
 
 
@@ -26,7 +27,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentRenameMixins(Client):
+class DocumentRenameMixins(BaseClient):
 
     rename_target = None
 

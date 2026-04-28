@@ -6,9 +6,10 @@ from typing import Union
 import sublime
 import sublime_plugin
 
+from ...client_internal import BaseClient
 from ...document import Document, is_valid_document
 from ...uri import path_to_uri
-from ...lsprotocol.client import Client, Hover
+from ...lsprotocol.client import Hover
 
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
@@ -26,7 +27,7 @@ def must_initialized(func):
     return wrapper
 
 
-class DocumentHoverMixins(Client):
+class DocumentHoverMixins(BaseClient):
 
     hover_target = None
     hover_point = 0

@@ -3,14 +3,15 @@ from collections import namedtuple
 import sublime
 from sublime import View
 
+from ...client_internal import BaseClient
 from ...uri import uri_to_path
 from ...diagnostic_reporter import Diagnostic
-from ...lsprotocol.client import Client, PublishDiagnosticsParams
+from ...lsprotocol.client import PublishDiagnosticsParams
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
 
-class DocumentDiagnosticsMixins(Client):
+class DocumentDiagnosticsMixins(BaseClient):
 
     def handle_publish_diagnostics_notification(
         self, context: dict, params: PublishDiagnosticsParams
