@@ -1,16 +1,17 @@
-from functools import wraps
 from typing import List
 import sublime
 import sublime_plugin
 
 from ...client_internal import BaseClient
-from ...document import Document, is_valid_document
+from ...document import Document, is_valid_document, TextChange
 from ...uri import path_to_uri
+from ...utils import client_must_ready, on_new_thread
 from ...lsprotocol.lsprotocol import TextDocumentContentChangePartial
 
 
 class DocumentSynchronizerMixins(BaseClient):
 
+    @on_new_thread
     def textdocument_didopen(self, view: sublime.View, *, reload: bool = False):
         capabilities = self.session.server_capabilities.get("textDocumentSync", {})
         if not capabilities.get("openClose", False):
@@ -50,6 +51,7 @@ class DocumentSynchronizerMixins(BaseClient):
         # Add current document
         self.session.add_document(document)
 
+    @on_new_thread
     def textdocument_didsave(self, view: sublime.View):
         capabilities = self.session.server_capabilities.get("textDocumentSync", {})
         if not capabilities.get("save", False):
@@ -64,6 +66,7 @@ class DocumentSynchronizerMixins(BaseClient):
             # untitled document not yet loaded to server
             self.textdocument_didopen(view)
 
+    @on_new_thread
     def textdocument_didclose(self, view: sublime.View):
         capabilities = self.session.server_capabilities.get("textDocumentSync", {})
         if not capabilities.get("openClose", False):
@@ -88,9 +91,8 @@ class DocumentSynchronizerMixins(BaseClient):
 
         self.session.remove_document(view)
 
-    def textdocument_didchange(
-        self, view: sublime.View, changes: List[sublime.TextChange]
-    ):
+    @on_new_thread
+    def textdocument_didchange(self, view: sublime.View, changes: List[TextChange]):
         capabilities = self.session.server_capabilities.get("textDocumentSync", {})
         change_mode = capabilities.get("change", 0)
         if not change_mode:
@@ -113,20 +115,16 @@ class DocumentSynchronizerMixins(BaseClient):
             )
 
     @staticmethod
-    def _textchange_to_rpc(
-        change: sublime.TextChange,
-    ) -> TextDocumentContentChangePartial:
+    def _textchange_to_rpc(change: TextChange) -> TextDocumentContentChangePartial:
         """"""
-        start = (change.a.row, change.a.col)
-        end = (change.b.row, change.b.col)
-
+        start, end = change.start, change.end
         return {
             "range": {
                 "start": {"line": start[0], "character": start[1]},
                 "end": {"line": end[0], "character": end[1]},
             },
-            "rangeLength": change.len_utf8,
-            "text": change.str,
+            "rangeLength": change.length,
+            "text": change.text,
         }
 
 
@@ -148,20 +146,10 @@ class SynchronizeEventAdapter:
             return
         self.client.textdocument_didclose(view)
 
-    def didchange(self, view: sublime.View, changes: List[sublime.TextChange]):
+    def didchange(self, view: sublime.View, changes: List[TextChange]):
         if not is_valid_document(view):
             return
         self.client.textdocument_didchange(view, changes)
-
-
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
 
 
 class DocumentSynchronizeEventListener(
@@ -210,4 +198,11 @@ class DocumentSynchronizeTextChangeListener(
         view = self.buffer.primary_view()
         if not is_valid_document(view):
             return
-        self.didchange(view, changes)
+        self.didchange(view, [self._to_textchange(c) for c in changes])
+
+    @staticmethod
+    def _to_textchange(change: sublime.TextChange) -> TextChange:
+        """"""
+        start = (change.a.row, change.a.col)
+        end = (change.b.row, change.b.col)
+        return TextChange(start, end, change.str, change.len_utf8)

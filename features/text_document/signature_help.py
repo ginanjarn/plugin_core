@@ -1,5 +1,4 @@
 from collections import namedtuple
-from functools import wraps
 from typing import Union
 import sublime
 import sublime_plugin
@@ -7,6 +6,7 @@ import sublime_plugin
 from ...client_internal import BaseClient
 from ...document import is_valid_document
 from ...uri import path_to_uri
+from ...utils import client_must_ready, on_main_thread, on_new_thread
 from ...lsprotocol.client import SignatureHelp
 
 
@@ -17,6 +17,7 @@ class DocumentSignatureHelpMixins(BaseClient):
 
     signature_help_target = None
 
+    @on_new_thread
     def textdocument_signaturehelp(self, view: sublime.View, row: int, col: int):
         capabilities = self.session.server_capabilities.get("signatureHelpProvider", {})
         if not capabilities:
@@ -30,6 +31,7 @@ class DocumentSignatureHelpMixins(BaseClient):
                 },
             )
 
+    @on_main_thread
     def handle_signature_help_result(
         self, context: dict, result: Union[SignatureHelp, None]
     ) -> None:
@@ -65,16 +67,6 @@ class DocumentSignatureHelpMixins(BaseClient):
                 "markup": markup,
             },
         )
-
-
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
 
 
 class _DocumentSignatureHelpCommand(sublime_plugin.TextCommand):

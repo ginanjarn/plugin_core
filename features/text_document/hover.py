@@ -1,6 +1,4 @@
-import threading
 from collections import namedtuple
-from functools import wraps
 from html import escape as escape_html
 from typing import Union
 import sublime
@@ -9,6 +7,7 @@ import sublime_plugin
 from ...client_internal import BaseClient
 from ...document import Document, is_valid_document
 from ...uri import path_to_uri
+from ...utils import client_must_ready, on_main_thread, on_new_thread
 from ...lsprotocol.client import Hover
 
 
@@ -21,10 +20,11 @@ class DocumentHoverMixins(BaseClient):
     hover_point = 0
     diagnostic_message = ""
 
+    @on_new_thread
     def textdocument_hover(self, view: sublime.View, row: int, col: int):
         if not self.session.server_capabilities.get("hoverProvider", False):
             return
-        # method = "textDocument/hover"
+
         # In multi row/column layout, new popup will created in current View,
         # but active popup doesn't discarded.
         if other := self.hover_target:
@@ -51,6 +51,7 @@ class DocumentHoverMixins(BaseClient):
                 }
             )
 
+    @on_main_thread
     def handle_hover_result(self, context: dict, result: Union[Hover, None]) -> None:
         if not result:
             return
@@ -117,16 +118,6 @@ class DocumentHoverMixins(BaseClient):
         return "\n".join([f"- {escape_html(d)}" for d in items])
 
 
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
-
-
 class HoverEventListener(sublime_plugin.EventListener):
     client: DocumentHoverMixins = None
 
@@ -137,7 +128,7 @@ class HoverEventListener(sublime_plugin.EventListener):
         if not is_valid_document(view):
             return
         row, col = view.rowcol(point)
-        threading.Thread(target=self._on_hover_task, args=(view, row, col)).start()
+        self._on_hover_task(view, row, col)
 
     def _on_hover_task(self, view: sublime.View, row: int, col: int):
         # Hover may be not in current active document, open it

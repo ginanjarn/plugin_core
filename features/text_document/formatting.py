@@ -1,4 +1,3 @@
-from functools import wraps
 from typing import List, Union
 import sublime
 import sublime_plugin
@@ -7,6 +6,7 @@ from ...client_internal import BaseClient
 from ...document import is_valid_document
 from ...features.workspace.workspace_edit import WorkspaceEdit
 from ...uri import path_to_uri
+from ...utils import client_must_ready, on_main_thread, on_new_thread
 from ...lsprotocol.client import TextEdit
 
 
@@ -14,6 +14,7 @@ class DocumentFormattingMixins(BaseClient):
 
     formatting_target = None
 
+    @on_new_thread
     def textdocument_formatting(self, view: sublime.View):
         if not self.session.server_capabilities.get(
             "documentFormattingProvider", False
@@ -25,6 +26,7 @@ class DocumentFormattingMixins(BaseClient):
                 {"textDocument": {"uri": path_to_uri(document.file_name)}}
             )
 
+    @on_main_thread
     def handle_document_formatting_result(
         self, context: dict, result: Union[List[TextEdit], None]
     ) -> None:
@@ -33,16 +35,6 @@ class DocumentFormattingMixins(BaseClient):
         WorkspaceEdit(self.session).apply_text_edit(
             self.formatting_target.file_name, result
         )
-
-
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
 
 
 class _DocumentFormattingCommand(sublime_plugin.TextCommand):

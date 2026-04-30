@@ -1,4 +1,3 @@
-from functools import wraps
 from typing import List, Optional, Union
 import sublime
 import sublime_plugin
@@ -6,6 +5,7 @@ import sublime_plugin
 from ...client_internal import BaseClient
 from ...document import is_valid_document
 from ...uri import path_to_uri
+from ...utils import client_must_ready, on_main_thread, on_new_thread
 from ...features.workspace.workspace_edit import WorkspaceEdit
 from ...lsprotocol.client import Command, CodeAction
 
@@ -14,6 +14,7 @@ class DocumentCodeActionMixins(BaseClient):
 
     code_action_target = None
 
+    @on_new_thread
     def textdocument_codeaction(
         self,
         view: sublime.View,
@@ -45,6 +46,7 @@ class DocumentCodeActionMixins(BaseClient):
                 },
             )
 
+    @on_main_thread
     def handle_code_action_result(
         self, context: dict, result: Union[List[Union[Command, CodeAction]], None]
     ) -> None:
@@ -91,16 +93,6 @@ class DocumentCodeActionMixins(BaseClient):
         if not result:
             return
         self._handle_code_action(self.session, result)
-
-
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
 
 
 class _CodeActionCommand(sublime_plugin.TextCommand):

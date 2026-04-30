@@ -1,5 +1,4 @@
 from collections import namedtuple
-from functools import wraps
 from typing import List, Union
 import sublime
 import sublime_plugin
@@ -7,6 +6,7 @@ import sublime_plugin
 from ...client_internal import BaseClient
 from ...document import is_valid_document
 from ...uri import path_to_uri, uri_to_path
+from ...utils import client_must_ready, on_main_thread, on_new_thread
 from ...lsprotocol.client import SymbolInformation, DocumentSymbol
 
 
@@ -20,6 +20,7 @@ class DocumentSymbolMixins(BaseClient):
 
     symbol_target = None
 
+    @on_new_thread
     def textdocument_symbol(self, view: sublime.View):
         if not self.session.server_capabilities.get("documentSymbolProvider", False):
             return
@@ -29,6 +30,7 @@ class DocumentSymbolMixins(BaseClient):
                 {"textDocument": {"uri": path_to_uri(document.file_name)}}
             )
 
+    @on_main_thread
     def handle_document_symbol_result(
         self,
         context: dict,
@@ -100,16 +102,6 @@ class SymbolSelector:
         self.active_view.sel().clear()
         self.active_view.sel().add_all(self.active_selections)
         self.active_view.show(self.visible_region)
-
-
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
 
 
 class _DocumentSymbolCommand(sublime_plugin.TextCommand):

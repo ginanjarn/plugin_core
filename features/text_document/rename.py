@@ -1,5 +1,4 @@
 from collections import namedtuple
-from functools import wraps
 from typing import Optional, Union
 import sublime
 import sublime_plugin
@@ -9,6 +8,7 @@ from ...document import is_valid_document
 from ...uri import path_to_uri
 from ...features.workspace.workspace_edit import WorkspaceEdit
 from ...lsprotocol.client import PrepareRenameResult, WorkspaceEdit as LspWorkspaceEdit
+from ...utils import client_must_ready, on_main_thread, on_new_thread
 from ....constant import COMMAND_PREFIX
 
 
@@ -19,6 +19,7 @@ class DocumentRenameMixins(BaseClient):
 
     rename_target = None
 
+    @on_new_thread
     def textdocument_preparerename(self, view: sublime.View, row: int, col: int):
         if not self.session.server_capabilities.get("renameProvider", False):
             return
@@ -31,6 +32,7 @@ class DocumentRenameMixins(BaseClient):
                 },
             )
 
+    @on_main_thread
     def handle_prepare_rename_result(
         self, context: dict, result: Union[PrepareRenameResult, None]
     ) -> None:
@@ -65,6 +67,7 @@ class DocumentRenameMixins(BaseClient):
             on_cancel=None,
         )
 
+    @on_new_thread
     def textdocument_rename(
         self, view: sublime.View, row: int, col: int, new_name: str
     ):
@@ -84,22 +87,13 @@ class DocumentRenameMixins(BaseClient):
                 }
             )
 
+    @on_main_thread
     def handle_rename_result(
         self, context: dict, result: Union[LspWorkspaceEdit, None]
     ) -> None:
         if not result:
             return
         WorkspaceEdit(self.session).apply(result)
-
-
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
 
 
 class _PrepareRenameCommand(sublime_plugin.TextCommand):

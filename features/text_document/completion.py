@@ -1,5 +1,4 @@
 from collections import defaultdict
-from functools import wraps
 from threading import Lock
 from typing import List, Union
 import sublime
@@ -8,6 +7,7 @@ import sublime_plugin
 from ...client_internal import BaseClient
 from ...document import is_valid_document
 from ...uri import path_to_uri
+from ...utils import client_must_ready, on_main_thread, on_new_thread
 from ...lsprotocol.client import CompletionList, CompletionItem
 
 
@@ -49,18 +49,6 @@ COMPLETION_KIND_MAP = defaultdict(
 )
 
 
-def must_initialized(func):
-    """exec if initialized"""
-
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if not self.session.is_initialized():
-            return None
-        return func(self, *args, **kwargs)
-
-    return wrapper
-
-
 class DocumentCompletionMixins(BaseClient):
 
     AUTO_COMPLETE_ARGUMENTS = {
@@ -88,7 +76,7 @@ class DocumentCompletionMixins(BaseClient):
             self._cached_completions = EMPTY
             return completions
 
-    @must_initialized
+    @on_new_thread
     def textdocument_completion(self, view: sublime.View, row: int, col: int):
         capabilities = self.session.server_capabilities.get("completionProvider", None)
         if not capabilities:
@@ -102,6 +90,7 @@ class DocumentCompletionMixins(BaseClient):
                 },
             )
 
+    @on_main_thread
     def handle_completion_result(
         self, context: dict, result: Union[List[CompletionItem], CompletionList, None]
     ) -> None:
@@ -143,6 +132,7 @@ class CompletionEventListener(sublime_plugin.EventListener):
         super().__init__(*args, **kwargs)
         self.prev_trigger_location = 0
 
+    @client_must_ready
     def on_query_completions(
         self, view: sublime.View, prefix: str, locations: List[int]
     ) -> sublime.CompletionList:

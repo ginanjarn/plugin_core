@@ -1,5 +1,4 @@
 from collections import namedtuple
-from functools import wraps
 from typing import Optional, List, Union
 import sublime
 import sublime_plugin
@@ -7,6 +6,7 @@ import sublime_plugin
 from ...client_internal import BaseClient
 from ...document import is_valid_document
 from ...uri import path_to_uri, uri_to_path
+from ...utils import client_must_ready, on_main_thread, on_new_thread
 from ...lsprotocol.client import Definition, Location, DefinitionLink
 
 
@@ -19,6 +19,7 @@ class DocumentDefinitionMixins(BaseClient):
 
     definition_target = None
 
+    @on_new_thread
     def textdocument_definition(self, view: sublime.View, row: int, col: int):
         if not self.session.server_capabilities.get("definitionProvider", False):
             return
@@ -31,6 +32,7 @@ class DocumentDefinitionMixins(BaseClient):
                 },
             )
 
+    @on_main_thread
     def handle_definition_result(
         self, context: dict, result: Union[Definition, List[DefinitionLink], None]
     ) -> None:
@@ -99,16 +101,6 @@ class LocationSelector:
         self.current_view.sel().clear()
         self.current_view.sel().add_all(self._selections)
         self.current_view.show(self._visible_region)
-
-
-def client_must_ready(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if self.client and self.client.is_ready():
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
 
 
 class _GotoDefinitionCommand(sublime_plugin.TextCommand):
