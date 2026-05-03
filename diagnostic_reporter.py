@@ -68,7 +68,10 @@ class ReportManager:
         self._show(view=view, force=True)
 
     def delete(self, view: sublime.View):
-        del self._diagnostics_map[view]
+        try:
+            del self._diagnostics_map[view]
+        except KeyError:
+            pass
 
     def show(self, view: View):
         self._show(view=view)
