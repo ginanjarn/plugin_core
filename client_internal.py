@@ -166,9 +166,13 @@ class RequestManager:
         return self.methods_map.pop(request_id)
 
     @lock
-    def is_pending_request(self, method: Method) -> bool:
-        """check if same method has pending request"""
-        return method in (meth for _, meth in self.methods_map.items())
+    def pop_pending(self, method: Method) -> Optional[int]:
+        """pop older request with same method"""
+        matches = (id for id, meth in self.methods_map.items() if meth == method)
+        if pending := next(matches, None):
+            del self.methods_map[pending]
+            return pending
+        return None
 
     @lock
     def cancel_all(self):
@@ -214,8 +218,7 @@ class ClientCommand(_MessageExchangeBase):
 
     def request(self, method: Method, params: Params) -> None:
         # cancel pending request
-        if self._request_manager.is_pending_request(method):
-            pending_id = self._request_manager.pop(method)
+        if pending_id := self._request_manager.pop_pending(method):
             self.notify("$/cancelRequest", {"id": pending_id})
 
         req_id = self._request_manager.add(method)
