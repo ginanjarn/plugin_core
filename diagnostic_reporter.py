@@ -9,6 +9,7 @@ import sublime
 from sublime import View
 
 from .document import TextChange
+from .sublime_settings import Settings as UserSettings
 from ..constant import PACKAGE_NAME, COMMAND_PREFIX
 
 
@@ -24,8 +25,15 @@ class Diagnostic:
 @dataclass
 class Settings:
     highlight_text: bool = True
-    show_status: bool = True
-    show_panel: bool = False
+    status_message: bool = True
+    report_panel: bool = False
+
+    @classmethod
+    def from_user_settings(cls, settings: sublime.Settings):
+        ht = settings.get("highlight_text")
+        sm = settings.get("status_message")
+        panel = settings.get("report_panel")
+        return cls(ht, sm, panel)
 
 
 class ReportManager:
@@ -34,8 +42,10 @@ class ReportManager:
     PUBLISH_KEY = "publish_diagnostic"
     CLEAR_KEY = "clear_diagnostic"
 
-    def __init__(self, settings: Settings = None) -> None:
+    def __init__(self) -> None:
         self.report_publisher = PubSub()
+        with UserSettings() as usr_settings:
+            settings = Settings.from_user_settings(usr_settings)
         self.register_reporter(settings)
 
         self._diagnostics_map: Dict[View, List[Diagnostic]] = defaultdict(list)
@@ -48,10 +58,10 @@ class ReportManager:
         key = f"{PACKAGE_NAME}_DIAGNOSTIC"
         if settings.highlight_text:
             reporters.append(HighlightText(key))
-        if settings.show_status:
+        if settings.status_message:
             reporters.append(StatusMessage(key))
-        if settings.show_panel:
-            reporters.append(DiagnosticPanel(PACKAGE_NAME))
+        if settings.report_panel:
+            reporters.append(ReportPanel(PACKAGE_NAME))
 
         for r in reporters:
             self.report_publisher.subscribe(self.PUBLISH_KEY, r.show)
@@ -148,7 +158,7 @@ class StatusMessage(AbstractReporter):
             view.erase_status(self._status_key)
 
 
-class DiagnosticPanel(AbstractReporter):
+class ReportPanel(AbstractReporter):
     def __init__(self, panel_name: str) -> None:
         self._panel = OutputPanel(panel_name)
 

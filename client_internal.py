@@ -38,7 +38,6 @@ from .message import (
 from .session import Session
 from .lsprotocol.client import Client as LSClient
 from .transport import Transport
-from .diagnostic_reporter import Settings as ReporterSettings
 from ..constant import LOGGING_CHANNEL
 
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
@@ -314,7 +313,6 @@ class BaseClient(RPC, ProcessManager):
         self,
         process: ChildProcess,
         transport: Transport,
-        report_settings: ReporterSettings = None,
     ):
 
         self.server_process = process
@@ -322,7 +320,7 @@ class BaseClient(RPC, ProcessManager):
 
         self._request_manager = RequestManager()
         # session data
-        self.session = Session(report_settings=report_settings)
+        self.session = Session()
 
     def reset_session(self) -> None:
         """reset session state"""
