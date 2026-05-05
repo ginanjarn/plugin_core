@@ -105,17 +105,17 @@ class DocumentHoverMixins(BaseClient):
 
     @staticmethod
     def _get_diagnostic_message(document: Document, row: int, col: int):
+        LC = LineCharacter
         items = [
-            " ".join([d.get("code", ""), d["message"]]).strip()
+            d
             for d in document.diagnostics
-            if LineCharacter(**d["range"]["start"])
-            <= LineCharacter(row, col)
-            <= LineCharacter(**d["range"]["end"])
+            if LC(**d["range"]["start"]) <= LC(row, col) <= LC(**d["range"]["end"])
         ]
         if not items:
             return ""
 
-        return "\n".join([f"- {escape_html(d)}" for d in items])
+        build_message = lambda d: " ".join([d.get("code", ""), d["message"]]).strip()
+        return "\n".join([f"- {escape_html(build_message(d))}" for d in items])
 
 
 class HoverEventListener(sublime_plugin.EventListener):
