@@ -77,6 +77,10 @@ class Context(MutableMapping):
     def __iter__(self) -> Iterator[_KT]:
         yield from iter(self.data)
 
+    @lock
+    def __len__(self) -> int:
+        return len(self.data)
+
 
 RequestHandler = Callable[[Context, Params], Any]
 NotificationHandler = Callable[[Context, Params], None]
@@ -284,7 +288,7 @@ class TaskImplementation(_MessageExchangeBase, LSClient):
             try:
                 message = self.recv()
                 typ = type(message)
-                handler_map[typ](self.session, message)
+                handler_map[typ](Context(), message)
 
             except EOFError:
                 # stdout closed
