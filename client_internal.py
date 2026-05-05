@@ -165,7 +165,7 @@ class RequestManager:
     @lock
     def is_pending_request(self, method: Method) -> bool:
         """check if same method has pending request"""
-        return method in self.methods_map
+        return method in (meth for _, meth in self.methods_map.items())
 
     @lock
     def cancel_all(self):
