@@ -30,9 +30,9 @@ class Settings:
 
     @classmethod
     def from_user_settings(cls, settings: sublime.Settings):
-        ht = settings.get("highlight_text")
-        sm = settings.get("status_message")
-        panel = settings.get("report_panel")
+        ht = settings.get("highlight_text", True)
+        sm = settings.get("status_message", True)
+        panel = settings.get("report_panel", False)
         return cls(ht, sm, panel)
 
 
