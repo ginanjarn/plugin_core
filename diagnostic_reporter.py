@@ -41,28 +41,40 @@ class ReportManager:
 
     PUBLISH_KEY = "publish_diagnostic"
     CLEAR_KEY = "clear_diagnostic"
+    SETTINGS_TAG = "diagnostic_report_setting"
 
     def __init__(self) -> None:
-        self.report_publisher = PubSub()
-        with UserSettings() as usr_settings:
-            settings = Settings.from_user_settings(usr_settings)
-        self.register_reporter(settings)
-
         self._diagnostics_map: Dict[View, List[Diagnostic]] = defaultdict(list)
         self._active_view: View = None
 
-    def register_reporter(self, settings: Settings = None):
-        settings = settings or Settings()
+        # reporter publisher
+        self.report_publisher = PubSub()
+
+        key = f"{PACKAGE_NAME}_DIAGNOSTIC"
+        self.highlight_text = HighlightText(key)
+        self.status_message = StatusMessage(key)
+        self.report_panel = ReportPanel(PACKAGE_NAME)
+
+        with UserSettings() as user_settings:
+            user_settings.add_on_change(self.SETTINGS_TAG, self.update_reporter)
+        self.update_reporter()
+
+    def update_reporter(self):
+        # clear existing report
+        self.report_publisher.publish(self.CLEAR_KEY)
+
+        with UserSettings() as user_settings:
+            settings = Settings.from_user_settings(user_settings)
 
         reporters = []
-        key = f"{PACKAGE_NAME}_DIAGNOSTIC"
         if settings.highlight_text:
-            reporters.append(HighlightText(key))
+            reporters.append(self.highlight_text)
         if settings.status_message:
-            reporters.append(StatusMessage(key))
+            reporters.append(self.status_message)
         if settings.report_panel:
-            reporters.append(ReportPanel(PACKAGE_NAME))
+            reporters.append(self.report_panel)
 
+        self.report_publisher.clear_subscriber()
         for r in reporters:
             self.report_publisher.subscribe(self.PUBLISH_KEY, r.show)
             self.report_publisher.subscribe(self.CLEAR_KEY, r.clear)
@@ -99,7 +111,10 @@ class ReportManager:
 
 class PubSub:
     def __init__(self) -> None:
-        self._subscribers: Dict[str, Set[Callable[..., None]]] = dict()
+        self._subscribers: Dict[str, Set[Callable[..., None]]] = defaultdict(set)
+
+    def clear_subscriber(self) -> None:
+        self._subscribers.clear()
 
     def subscribe(self, subject: str, callback: Callable[..., None]):
         try:
