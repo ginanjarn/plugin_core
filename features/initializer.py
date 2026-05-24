@@ -348,6 +348,10 @@ class InitializerMixins(BaseClient):
         params["capabilities"]["textDocument"]["completion"]["completionItem"][
             "labelDetailsSupport"
         ] = True
+        params["capabilities"]["textDocument"]["hover"]["contentFormat"] = [
+            "markdown",
+            "plaintext",
+        ]
         params["capabilities"]["textDocument"]["rename"]["prepareSupport"] = True
 
         self.session.client_capabilities = params["capabilities"]
