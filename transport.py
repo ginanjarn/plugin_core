@@ -23,14 +23,24 @@ class Transport(ABC):
 
     @abstractmethod
     def read(self) -> bytes:
-        """Read data from server"""
+        """Read data from server
+
+        Return:
+            content: bytes
+
+        Raises:
+            EOFError: if stdout closed
+            ValueError
+        """
 
 
-def wrap_rpc(content: bytes) -> bytes:
-    """wrap content as rpc body"""
+HEADER_SEPARATOR = b"\r\n"
+
+
+def set_header(content: bytes) -> bytes:
+    """set rpc header"""
     header = b"Content-Length: %d\r\n" % len(content)
-    separator = b"\r\n"
-    return b"%s%s%s" % (header, separator, content)
+    return b"%s%s%s" % (header, HEADER_SEPARATOR, content)
 
 
 def get_content_length(header: bytes) -> int:
@@ -67,7 +77,7 @@ class StandardIO(Transport):
     def write(self, data: bytes):
         self.server.wait_process_running()
 
-        prepared_data = wrap_rpc(data)
+        prepared_data = set_header(data)
         self.server.stdin.write(prepared_data)
         self.server.stdin.flush()
 
@@ -76,10 +86,9 @@ class StandardIO(Transport):
 
         # get header
         header_buffer = BytesIO()
-        header_separator = b"\r\n"
+        # loop until meet header separator
         while line := self.server.stdout.readline():
-            # header and content separated by newline with \r\n
-            if line == header_separator:
+            if line == HEADER_SEPARATOR:
                 break
             header_buffer.write(line)
 
