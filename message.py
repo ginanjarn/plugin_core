@@ -1,11 +1,6 @@
 """message"""
 
-from dataclasses import dataclass, asdict
-from json import (
-    loads as json_loads,
-    dumps as json_dumps,
-    JSONDecodeError,
-)
+from json import loads, dumps, JSONDecodeError
 from typing import Optional, Union, Dict, Any
 
 from .errors import ParseError
@@ -17,74 +12,50 @@ Result = Optional[Any]
 Error = Optional[Dict[str, Any]]
 
 
-@dataclass
-class Message:
-    """JSON-RPC Message interface"""
+def new_notification(method: Method, params: Params = None) -> dict:
+    return {"method": method, "params": params}
 
 
-@dataclass
-class Notification(Message):
-    method: Method
-    params: Params = None
+def new_request(id: int, method: Method, params: Params = None) -> dict:
+    return {"id": id, "method": method, "params": params}
 
 
-@dataclass
-class Request(Message):
-    id: int
-    method: Method
-    params: Params = None
-
-
-@dataclass
-class Response(Message):
-    id: int
-    result: Result = None
-    error: Error = None
+def new_response(id: int, result: Result = None, error: Error = None) -> dict:
+    if error:
+        return {"id": id, "error": error}
+    return {"id": id, "result": result}
 
 
 JSONRPC_KEY = "jsonrpc"
 JSONRPC_VERSION = "2.0"
 
 
-def loads(json_str: Union[str, bytes]) -> Message:
+def loads_rpc2(json_str: Union[str, bytes]) -> dict:
     """loads json-rpc message
 
     Raises:
-      * json.JsonDecodeError if fail loads json
-      * ValueError if invalid jsonrpc version
+        ParseError: failed to loads json
+        ValueError: invalid jsonrpc 2.0
     """
 
     try:
-        dct = json_loads(json_str)
+        dct = loads(json_str)
     except JSONDecodeError as err:
         raise ParseError(str(err)) from err
+    try:
+        if dct[JSONRPC_KEY] != JSONRPC_VERSION:
+            raise ValueError("invalid json-rpc version")
+    except KeyError as err:
+        raise ValueError("invalid json-rpc version") from err
 
-    version = dct.pop(JSONRPC_KEY, "1.0")
-    if version != JSONRPC_VERSION:
-        raise ValueError("invalid json-rpc version")
-
-    # Request and Notification contain 'method' key
-    if "method" in dct:
-        if "id" in dct:
-            return Request(**dct)
-        return Notification(**dct)
-    return Response(**dct)
+    return dct
 
 
-def dumps(message: Message, as_bytes: bool = False) -> Union[str, bytes]:
+def dumps_rpc2(message: dict, as_bytes: bool = False) -> Union[str, bytes]:
     """dumps json-rpc message"""
 
-    dct = asdict(message)
-    dct[JSONRPC_KEY] = JSONRPC_VERSION
-
-    if isinstance(message, Response):
-        # Response only contain one of 'result' or 'error' field
-        if not message.error:
-            del dct["error"]
-        else:
-            del dct["result"]
-
-    json_str = json_dumps(dct)
+    message[JSONRPC_KEY] = JSONRPC_VERSION
+    json_str = dumps(message)
     if as_bytes:
         return json_str.encode()
     return json_str

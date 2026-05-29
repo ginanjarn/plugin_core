@@ -4,15 +4,12 @@ from __future__ import annotations
 
 import logging
 import threading
-import sys
 from collections.abc import MutableMapping
 from functools import wraps
 from typing import (
     Optional,
     Dict,
-    Callable,
     Any,
-    Union,
     Iterator,
     TYPE_CHECKING,
 )
@@ -25,15 +22,14 @@ import sublime
 from .child_process import ChildProcess
 from .errors import transform_error
 from .message import (
-    Message,
-    Request,
-    Notification,
+    new_request,
+    new_notification,
     Method,
     Params,
-    Response,
+    new_response,
     Result,
-    loads,
-    dumps,
+    loads_rpc2,
+    dumps_rpc2,
 )
 from .session import Session
 from .lsprotocol.client import Client as LSClient
@@ -82,12 +78,6 @@ class Context(MutableMapping):
         return len(self.data)
 
 
-RequestHandler = Callable[[Context, Params], Any]
-NotificationHandler = Callable[[Context, Params], None]
-ResponseHandler = Callable[[Context, Response], None]
-SessionMessageHandler = Union[RequestHandler, NotificationHandler, ResponseHandler]
-
-
 class ProcessManager:
 
     _start_server_lock = threading.Lock()
@@ -109,7 +99,7 @@ class ProcessManager:
                 sublime.status_message("running language server...")
                 # sometimes the server stop working
                 # we must reset the state before run server
-                self.reset_session()
+                self._reset_session()
 
                 self.server_process.run(env)
                 self.listen()
@@ -117,7 +107,9 @@ class ProcessManager:
     def terminate(self) -> None:
         """terminate session"""
         self.server_process.terminate()
-        self.reset_session()
+
+    def _reset_session(self) -> None:
+        raise NotImplementedError("_reset_session")
 
 
 class RequestManager:
@@ -186,18 +178,18 @@ class _MessageExchangeBase:
         self.transport: Transport
         self._request_manager: RequestManager
 
-    def _reset_managers(self) -> None:
+    def _reset_request_manager(self) -> None:
         self._request_manager.reset()
 
-    def send(self, message: Message) -> None:
+    def send(self, message: dict) -> None:
         """send message"""
-        content = dumps(message, as_bytes=True)
+        content = dumps_rpc2(message, as_bytes=True)
         self.transport.write(content)
 
-    def recv(self) -> Message:
-        """recv message"""
+    def recv(self) -> dict:
+        """receive message"""
         content = self.transport.read()
-        return loads(content)
+        return loads_rpc2(content)
 
     def _handle(
         self, context: Context, method: Method, param_or_result: Optional[Any] = None
@@ -205,9 +197,13 @@ class _MessageExchangeBase:
         """handle command"""
         raise NotImplementedError("_handle")
 
+    def _listen_task(self):
+        """listen task"""
+        raise NotImplementedError("_listen_task")
+
     def listen(self) -> None:
         """listen message"""
-        self._reset_managers()
+        self._reset_request_manager()
 
         thread = threading.Thread(target=self._listen_task, daemon=True)
         thread.start()
@@ -222,21 +218,21 @@ class ClientCommand(_MessageExchangeBase):
             self.notify("$/cancelRequest", {"id": pending_id})
 
         req_id = self._request_manager.add(method)
-        self.send(Request(req_id, method, params))
+        self.send(new_request(req_id, method, params))
 
-    def _handle_response(self, context: Context, response: Response) -> None:
+    def _handle_response(self, context: Context, message: dict) -> None:
         try:
-            method = self._request_manager.pop(response.id)
+            method = self._request_manager.pop(message["id"])
         except KeyError:
             # ignore canceled response
             return
 
-        if error := response.error:
-            print(error["message"], file=sys.stderr)
+        if error := message.get("error"):
+            print(error["message"])
             return
 
         try:
-            self._handle(context, method, response.result)
+            self._handle(context, method, message["result"])
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
 
@@ -247,55 +243,64 @@ class ClientCommand(_MessageExchangeBase):
         }:
             # cancel all current request
             self._request_manager.cancel_all()
-        self.send(Notification(method, params))
+        self.send(new_notification(method, params))
 
 
 class ServerCommand(_MessageExchangeBase):
     """Server command interface"""
 
-    def _handle_request(self, context: Context, request: Request) -> None:
+    def _handle_request(self, context: Context, message: dict) -> None:
         result = None
         error = None
         try:
-            result = self._handle(context, request.method, request.params)
+            result = self._handle(context, message["method"], message["params"])
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
             error = transform_error(err)
 
-        self._respond(request.id, result, error)
+        self._respond(message.id, result, error)
 
     def _respond(
         self, id: int, result: Optional[Any] = None, error: Optional[dict] = None
     ) -> None:
-        self.send(Response(id, result, error))
+        self.send(new_response(id, result, error))
 
-    def _handle_notification(
-        self, context: Context, notification: Notification
-    ) -> None:
+    def _handle_notification(self, context: Context, message: dict) -> None:
         try:
-            self._handle(context, notification.method, notification.params)
+            self._handle(context, message["method"], message["params"])
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
 
 
-class TaskImplementation(_MessageExchangeBase, LSClient):
+class RPC(ClientCommand, ServerCommand, LSClient):
+    """Remote Procedure Call"""
 
     def _listen_task(self) -> None:
-        handler_map = {
-            Notification: self._handle_notification,
-            Request: self._handle_request,
-            Response: self._handle_response,
-        }
-
         while True:
             try:
                 message = self.recv()
-                typ = type(message)
-                handler_map[typ](Context(), message)
-
             except EOFError:
                 # stdout closed
                 break
+            except Exception as err:
+                LOGGER.error("error parsing message: %s", err)
+                break
+
+            try:
+                # context required in 'LSClient' params
+                context = Context()
+                has_id = "id" in message
+
+                if "method" in message:
+                    # server command
+                    if has_id:
+                        self._handle_request(context, message)
+                    else:
+                        self._handle_notification(context, message)
+                else:
+                    # server response
+                    self._handle_response(context, message)
+
             except Exception:
                 LOGGER.error("error handle message: %r", message, exc_info=True)
                 break
@@ -306,11 +311,8 @@ class TaskImplementation(_MessageExchangeBase, LSClient):
     def _handle(
         self, context: Context, method: Method, param_or_result: Optional[Any] = None
     ) -> Optional[Result]:
+        # adapter for 'LSClient.handle'
         return self.handle(context, method, param_or_result)
-
-
-class RPC(TaskImplementation, ClientCommand, ServerCommand):
-    """Remote Procedure Call"""
 
 
 class BaseClient(RPC, ProcessManager):
@@ -329,7 +331,7 @@ class BaseClient(RPC, ProcessManager):
         # session data
         self.session = Session()
 
-    def reset_session(self) -> None:
+    def _reset_session(self) -> None:
         """reset session state"""
         self.session.reset()
 
