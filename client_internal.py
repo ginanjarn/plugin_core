@@ -9,6 +9,7 @@ from functools import wraps
 from typing import (
     Optional,
     Dict,
+    List,
     Any,
     Iterator,
     TYPE_CHECKING,
@@ -88,8 +89,14 @@ class ProcessManager:
     def is_server_running(self) -> bool:
         return self.server_process and self.server_process.is_running()
 
-    def start_server(self, env: Optional[dict] = None) -> None:
+    def start_server(
+        self, command: Optional[List[str]] = None, env: Optional[dict] = None
+    ) -> None:
         """"""
+        # update command
+        if command:
+            self.server_process.command = command
+
         # only one thread can run server
         if self._start_server_lock.locked():
             return

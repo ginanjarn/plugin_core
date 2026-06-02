@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 import sublime
 import sublime_plugin
 
@@ -9,8 +9,13 @@ class _StartServerCommand(sublime_plugin.TextCommand):
 
     client: Client = None
 
-    def run(self, edit: sublime.Edit, envs: Optional[dict] = None):
-        self.client.start_server(envs)
+    def run(
+        self,
+        edit: sublime.Edit,
+        command: Optional[List[str]] = None,
+        envs: Optional[dict] = None,
+    ):
+        self.client.start_server(command, envs)
 
     def is_visible(self):
         if not self.client:
