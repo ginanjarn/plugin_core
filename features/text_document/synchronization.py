@@ -5,13 +5,12 @@ import sublime_plugin
 from ...client_internal import BaseClient
 from ...document import Document, is_valid_document, TextChange
 from ...uri import path_to_uri
-from ...utils import client_must_ready, on_new_thread
+from ...utils import client_must_ready
 from ...lsprotocol.lsprotocol import TextDocumentContentChangePartial
 
 
 class DocumentSynchronizerMixins(BaseClient):
 
-    @on_new_thread
     def textdocument_didopen(self, view: sublime.View, *, reload: bool = False):
         capabilities = self.session.server_capabilities.get("textDocumentSync", {})
         if not capabilities.get("openClose", False):
@@ -51,7 +50,6 @@ class DocumentSynchronizerMixins(BaseClient):
         # Add current document
         self.session.add_document(document)
 
-    @on_new_thread
     def textdocument_didsave(self, view: sublime.View):
         capabilities = self.session.server_capabilities.get("textDocumentSync", {})
         if not capabilities.get("save", False):
@@ -66,7 +64,6 @@ class DocumentSynchronizerMixins(BaseClient):
             # untitled document not yet loaded to server
             self.textdocument_didopen(view)
 
-    @on_new_thread
     def textdocument_didclose(self, view: sublime.View):
         capabilities = self.session.server_capabilities.get("textDocumentSync", {})
         if not capabilities.get("openClose", False):
@@ -91,7 +88,6 @@ class DocumentSynchronizerMixins(BaseClient):
 
         self.session.remove_document(view)
 
-    @on_new_thread
     def textdocument_didchange(self, view: sublime.View, changes: List[TextChange]):
         capabilities = self.session.server_capabilities.get("textDocumentSync", {})
         change_mode = capabilities.get("change", 0)
