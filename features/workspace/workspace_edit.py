@@ -19,7 +19,6 @@ from ...lsprotocol.lsprotocol import (
 )
 from ....constant import COMMAND_PREFIX
 
-
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 PathStr = str
 
@@ -134,18 +133,18 @@ class TextFile:
         new_text = self._apply_text_changes(old_text, text_changes)
         self.path.write_text(new_text)
 
-    def _get_offset(self, lines: List[str], row: int, column: int) -> int:
-        line_offset = sum([len(l) for l in lines[:row]])
-        return line_offset + column
-
     def _apply_text_changes(self, source: str, text_changes: List[TextChange]) -> str:
-        temp = source
+        line_end = "\n"
+        lines = source.split(line_end)
 
+        # Apply text_changes from last to begin to ensure text changes don't
+        # break change location
+        text_changes = sorted(text_changes, key=lambda c: c.start, reverse=True)
         for change in text_changes:
-            lines = temp.splitlines(keepends=True)
-            start_offset = self._get_offset(lines, *change.start)
-            end_offset = self._get_offset(lines, *change.end)
+            srow, scol = change.start
+            erow, ecol = change.end
 
-            temp = f"{temp[:start_offset]}{change.text}{temp[end_offset:]}"
+            insert = lines[srow][:scol] + change.text + lines[erow][ecol:]
+            lines = lines[:srow] + [insert] + lines[erow + 1 :]
 
-        return temp
+        return line_end.join(lines)

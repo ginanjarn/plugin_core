@@ -15,13 +15,6 @@ class _BufferedTextChange:
 
     __slots__ = ("region", "old_text", "new_text")
 
-    def offset_move(self) -> int:
-        return len(self.new_text) - len(self.old_text)
-
-    def get_moved_region(self, move: int) -> sublime.Region:
-        a, b = self.region.to_tuple()
-        return sublime.Region(a + move, b + move)
-
 
 class _ApplyTextChangesCommand(sublime_plugin.TextCommand):
     """Apply text change command
@@ -34,11 +27,11 @@ class _ApplyTextChangesCommand(sublime_plugin.TextCommand):
         self.apply(edit, text_changes)
 
     def apply(self, edit: sublime.Edit, text_changes: List[_BufferedTextChange]):
-        move = 0
+        # Apply text_changes from last to begin to ensure text changes don't
+        # break change location
+        text_changes = sorted(text_changes, key=lambda c: c.region, reverse=True)
         for change in text_changes:
-            replaced_region = change.get_moved_region(move)
-            self.view.replace(edit, replaced_region, change.new_text)
-            move += change.offset_move()
+            self.view.replace(edit, change.region, change.new_text)
 
     def to_text_change(self, change: dict) -> _BufferedTextChange:
         text_point = self.view.text_point
