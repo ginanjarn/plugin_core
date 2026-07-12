@@ -1,3 +1,4 @@
+from threading import Thread
 from functools import wraps
 import sublime
 
@@ -30,7 +31,7 @@ def on_new_thread(func):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        sublime.set_timeout_async(lambda: func(*args, **kwargs))
+        Thread(target=func, args=args, kwargs=kwargs).run()
         return None
 
     return wrapper
