@@ -123,7 +123,7 @@ class RequestManager:
     """RequestManager manage method mapped to request_id."""
 
     def __init__(self):
-        self.methods_map: Dict[int, Method] = {}
+        self.pending: Dict[int, Method] = {}
         self.request_count = 0
 
         self._lock = threading.Lock()
@@ -138,45 +138,43 @@ class RequestManager:
 
     @lock
     def reset(self) -> None:
-        self.methods_map.clear()
+        self.pending.clear()
         self.request_count = 0
 
     @lock
     def add(self, method: Method) -> int:
-        """add request method to request_map
+        """add pending request
 
         Return:
             request_count: int
         """
         self.request_count += 1
-        self.methods_map[self.request_count] = method
+        self.pending[self.request_count] = method
 
         return self.request_count
 
     @lock
-    def pop(self, request_id: int) -> Method:
-        """pop method paired with request_id
+    def pop(self, request_id: int) -> Optional[Method]:
+        """pop pending request
 
         Return:
-            method: str
-        Raises:
-            KeyError if request_id not found
+            method: Method
         """
-        return self.methods_map.pop(request_id)
+        return self.pending.pop(request_id, None)
 
     @lock
     def pop_pending(self, method: Method) -> Optional[int]:
-        """pop older request with same method"""
-        matches = (id for id, meth in self.methods_map.items() if meth == method)
-        if pending := next(matches, None):
-            del self.methods_map[pending]
-            return pending
+        """pop pending request"""
+        matches = (id for id, meth in self.pending.items() if meth == method)
+        if id := next(matches, None):
+            del self.pending[id]
+            return id
         return None
 
     @lock
     def cancel_all(self):
-        """cancel all request"""
-        self.methods_map.clear()
+        """cancel all pending request"""
+        self.pending.clear()
 
 
 class _MessageExchangeBase:
@@ -228,10 +226,8 @@ class ClientCommand(_MessageExchangeBase):
         self.send(new_request(req_id, method, params))
 
     def _handle_response(self, context: Context, message: dict) -> None:
-        try:
-            method = self._request_manager.pop(message["id"])
-        except KeyError:
-            # ignore canceled response
+        method = self._request_manager.pop(message["id"])
+        if method is None:
             return
 
         if error := message.get("error"):
