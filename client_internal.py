@@ -103,20 +103,41 @@ class ProcessManager:
 
         with self._start_server_lock:
             if not self.server_process.is_running():
-                sublime.status_message("running language server...")
-                # sometimes the server stop working
-                # we must reset the state before run server
-                self._reset_session()
-
                 self.server_process.run(env)
-                self.listen()
+                self.connect()
 
     def terminate(self) -> None:
-        """terminate session"""
+        """terminate server"""
         self.server_process.terminate()
 
-    def _reset_session(self) -> None:
-        raise NotImplementedError("_reset_session")
+    def connect(self) -> None:
+        raise NotImplementedError("not implemented method 'connect'")
+
+
+class _MessageExchangeBase:
+
+    def __init__(self, transport: Transport):
+        self.transport = transport
+
+    def send(self, message: dict) -> None:
+        """send message"""
+        content = dumps_rpc2(message, as_bytes=True)
+        self.transport.write(content)
+
+    def recv(self) -> dict:
+        """receive message"""
+        content = self.transport.read()
+        return loads_rpc2(content)
+
+    def _handle(
+        self, context: Context, method: Method, param_or_result: Optional[Any] = None
+    ) -> Optional[Result]:
+        """handle command"""
+        raise NotImplementedError("_handle")
+
+    def listen(self) -> None:
+        """listen message"""
+        raise NotImplementedError("listen")
 
 
 class RequestManager:
@@ -177,56 +198,23 @@ class RequestManager:
         self.pending.clear()
 
 
-class _MessageExchangeBase:
-
-    def __init__(self, *args, **kwargs):
-        self.transport: Transport
-        self._request_manager: RequestManager
-
-    def _reset_request_manager(self) -> None:
-        self._request_manager.reset()
-
-    def send(self, message: dict) -> None:
-        """send message"""
-        content = dumps_rpc2(message, as_bytes=True)
-        self.transport.write(content)
-
-    def recv(self) -> dict:
-        """receive message"""
-        content = self.transport.read()
-        return loads_rpc2(content)
-
-    def _handle(
-        self, context: Context, method: Method, param_or_result: Optional[Any] = None
-    ) -> Optional[Result]:
-        """handle command"""
-        raise NotImplementedError("_handle")
-
-    def _listen_task(self):
-        """listen task"""
-        raise NotImplementedError("_listen_task")
-
-    def listen(self) -> None:
-        """listen message"""
-        self._reset_request_manager()
-
-        thread = threading.Thread(target=self._listen_task, daemon=True)
-        thread.start()
-
-
 class ClientCommand(_MessageExchangeBase):
     """Client command interface"""
 
+    def __init__(self, transport: Transport):
+        super().__init__(transport)
+        self.request_manager = RequestManager()
+
     def request(self, method: Method, params: Params) -> None:
         # cancel pending request
-        if pending_id := self._request_manager.pop_pending(method):
+        if pending_id := self.request_manager.pop_pending(method):
             self.notify("$/cancelRequest", {"id": pending_id})
 
-        req_id = self._request_manager.add(method)
+        req_id = self.request_manager.add(method)
         self.send(new_request(req_id, method, params))
 
     def _handle_response(self, context: Context, message: dict) -> None:
-        method = self._request_manager.pop(message["id"])
+        method = self.request_manager.pop(message["id"])
         if method is None:
             return
 
@@ -245,7 +233,7 @@ class ClientCommand(_MessageExchangeBase):
             "textDocument/didChange",
         }:
             # cancel all current request
-            self._request_manager.cancel_all()
+            self.request_manager.cancel_all()
         self.send(new_notification(method, params))
 
 
@@ -278,6 +266,28 @@ class ServerCommand(_MessageExchangeBase):
 class RPC(ClientCommand, ServerCommand, LSClient):
     """Remote Procedure Call"""
 
+    def __init__(self, transport: Transport):
+        super().__init__(transport)
+        self.session = Session()
+
+    def connect(self) -> None:
+        sublime.status_message("connecting to language server...")
+        self.transport.connect()
+
+        # sometimes the server stop working
+        # we must reset the state before run server
+        self.session.reset()
+        self.listen()
+
+    def disconnect(self) -> None:
+        self.transport.close()
+
+    def listen(self) -> None:
+        self.request_manager.reset()
+
+        thread = threading.Thread(target=self._listen_task, daemon=True)
+        thread.start()
+
     def _listen_task(self) -> None:
         while True:
             try:
@@ -308,8 +318,8 @@ class RPC(ClientCommand, ServerCommand, LSClient):
                 LOGGER.error("error handle message: %r", message, exc_info=True)
                 break
 
-        # terminated
-        self.terminate()
+        # disconnent
+        self.disconnect()
 
     def _handle(
         self, context: Context, method: Method, param_or_result: Optional[Any] = None
@@ -326,18 +336,9 @@ class BaseClient(RPC, ProcessManager):
         process: ChildProcess,
         transport: Transport,
     ):
-
+        super().__init__(transport)
         self.server_process = process
-        self.transport = transport
-
-        self._request_manager = RequestManager()
-        # session data
-        self.session = Session()
-
-    def _reset_session(self) -> None:
-        """reset session state"""
-        self.session.reset()
 
     def is_ready(self) -> bool:
-        """check session is ready"""
+        """check client is ready"""
         return self.server_process.is_running() and self.session.is_initialized()
