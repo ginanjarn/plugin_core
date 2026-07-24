@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from io import BytesIO
+from threading import Event
 
 from .child_process import ChildProcess
 
@@ -16,6 +17,10 @@ class Transport(ABC):
     @abstractmethod
     def disconnect(self) -> None:
         """disconnect from server"""
+
+    @abstractmethod
+    def is_connected(self) -> bool:
+        """check is connected to server"""
 
     @abstractmethod
     def write(self, data: bytes) -> None:
@@ -66,23 +71,32 @@ class StandardIO(Transport):
 
     def __init__(self, server: ChildProcess) -> None:
         self.server = server
+        self._is_connected = False
+        self._connect_event = Event()
 
     def connect(self) -> None:
-        # connect with stdio
-        pass
+        self._is_connected = True
+        self._connect_event.set()
 
     def disconnect(self) -> None:
         self.server.terminate()
+        self._connect_event.clear()
+        self._is_connected = False
+
+    def is_connected(self) -> bool:
+        return self._is_connected
 
     def write(self, data: bytes):
-        self.server.wait_process_running()
+        if not self._is_connected:
+            self._connect_event.wait()
 
         prepared_data = set_header(data)
         self.server.stdin.write(prepared_data)
         self.server.stdin.flush()
 
     def read(self):
-        self.server.wait_process_running()
+        if not self._is_connected:
+            self._connect_event.wait()
 
         # get header
         header_buffer = BytesIO()

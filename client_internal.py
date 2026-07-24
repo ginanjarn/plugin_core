@@ -341,4 +341,4 @@ class BaseClient(RPC, ProcessManager):
 
     def is_ready(self) -> bool:
         """check client is ready"""
-        return self.server_process.is_running() and self.session.is_initialized()
+        return self.transport.is_connected() and self.session.is_initialized()
