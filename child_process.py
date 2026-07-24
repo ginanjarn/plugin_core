@@ -60,16 +60,11 @@ class ChildProcess:
         self.process: subprocess.Popen = None
         # lock for run() and terminate() call
         self._switch_lock = threading.Lock()
-        self._run_event = threading.Event()
         self._terminate_process_event = threading.Event()
 
     def is_running(self) -> bool:
         """If process is running"""
         return bool(self.process) and self.process.poll() is None
-
-    def wait_process_running(self) -> None:
-        """Wait process running"""
-        self._run_event.wait()
 
     def run(self, env: Optional[dict] = None) -> None:
         """Run process"""
@@ -94,9 +89,6 @@ class ChildProcess:
                 bufsize=0,
                 startupinfo=STARTUPINFO,
             )
-
-            # Ready to call 'Popen()' object
-            self._run_event.set()
 
             thread = threading.Thread(target=self._listen_stderr_task)
             thread.start()
@@ -132,7 +124,6 @@ class ChildProcess:
 
         with self._switch_lock:
             self._terminate_process_event.clear()
-            self._run_event.clear()
 
             if not self.process:
                 return
