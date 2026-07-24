@@ -11,11 +11,11 @@ class Transport(ABC):
 
     @abstractmethod
     def connect(self) -> None:
-        """open connection to server"""
+        """connection to server"""
 
     @abstractmethod
-    def close(self) -> None:
-        """close connection to server"""
+    def disconnect(self) -> None:
+        """disconnect from server"""
 
     @abstractmethod
     def write(self, data: bytes) -> None:
@@ -71,7 +71,7 @@ class StandardIO(Transport):
         # connect with stdio
         pass
 
-    def close(self) -> None:
+    def disconnect(self) -> None:
         self.server.terminate()
 
     def write(self, data: bytes):

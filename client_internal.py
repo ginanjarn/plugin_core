@@ -280,7 +280,7 @@ class RPC(ClientCommand, ServerCommand, LSClient):
         self.listen()
 
     def disconnect(self) -> None:
-        self.transport.close()
+        self.transport.disconnect()
 
     def listen(self) -> None:
         self.request_manager.reset()
