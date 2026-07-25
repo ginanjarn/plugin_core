@@ -34,7 +34,7 @@ from .message import (
 )
 from .session import Session
 from .lsprotocol.client import Client as LSClient
-from .transport import Transport
+from .transport import Transport, ConnectionError
 from ..constant import LOGGING_CHANNEL
 
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
@@ -292,8 +292,7 @@ class RPC(ClientCommand, ServerCommand, LSClient):
         while True:
             try:
                 message = self.recv()
-            except EOFError:
-                # stdout closed
+            except ConnectionError:
                 break
             except Exception as err:
                 LOGGER.error("error parsing message: %s", err)

@@ -7,6 +7,10 @@ from threading import Event
 from .child_process import ChildProcess
 
 
+class ConnectionError(Exception):
+    """Connection Error"""
+
+
 class Transport(ABC):
     """Transport abstraction"""
 
@@ -91,8 +95,12 @@ class StandardIO(Transport):
             self._connect_event.wait()
 
         prepared_data = set_header(data)
-        self.server.stdin.write(prepared_data)
-        self.server.stdin.flush()
+        try:
+            self.server.stdin.write(prepared_data)
+            self.server.stdin.flush()
+        except Exception as err:
+            self._is_connected = False
+            raise ConnectionError("disconnected from server") from err
 
     def read(self):
         if not self._is_connected:
@@ -109,7 +117,8 @@ class StandardIO(Transport):
         if header := header_buffer.getvalue():
             content_length = get_content_length(header)
         else:
-            raise EOFError("stdout closed")
+            self._is_connected = False
+            raise ConnectionError("disconnected from server")
 
         content_buffer = BytesIO()
         # Read until defined content_length received.
@@ -119,6 +128,7 @@ class StandardIO(Transport):
                 n = content_buffer.write(chunk)
                 missing -= n
             else:
-                raise EOFError("stdout closed")
+                self._is_connected = False
+                raise ConnectionError("disconnected from server")
 
         return content_buffer.getvalue()
