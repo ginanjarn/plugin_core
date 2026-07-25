@@ -59,22 +59,21 @@ class ChildProcess:
 
         self.process: subprocess.Popen = None
         # lock for run() and terminate() call
-        self._switch_lock = threading.Lock()
-        self._terminate_process_event = threading.Event()
+        self._switch_lock = threading.RLock()
+        self._is_running = False
+        self._stderr_closed_event = threading.Event()
 
     def is_running(self) -> bool:
         """If process is running"""
-        return bool(self.process) and self.process.poll() is None
+        with self._switch_lock:
+            return self._is_running
 
     def run(self, env: Optional[dict] = None) -> None:
         """Run process"""
 
-        if self._switch_lock.locked():
-            return
-
         with self._switch_lock:
             # Prevent process reassignment
-            if self.process and self.process.poll() is None:
+            if self._is_running:
                 return
 
             print("execute '%s'" % shlex.join(self.command))
@@ -90,8 +89,12 @@ class ChildProcess:
                 startupinfo=STARTUPINFO,
             )
 
-            thread = threading.Thread(target=self._listen_stderr_task)
-            thread.start()
+            thread1 = threading.Thread(target=self._listen_stderr_task, daemon=True)
+            thread2 = threading.Thread(target=self._wait_exit_task, daemon=True)
+
+            thread1.start()
+            thread2.start()
+            self._is_running = True
 
     @property
     @recover_exception(BytesIO)
@@ -109,30 +112,37 @@ class ChildProcess:
         return self.process.stderr
 
     def _listen_stderr_task(self):
-        prefix = f"[{self.command[0]}]"
-        while bline := self.stderr.readline():
-            print(prefix, bline.rstrip().decode())
+        self._stderr_closed_event.clear()
 
-        # Stderr return empty character, process is terminated
-        self._terminate_process_event.set()
+        prefix = f"[{self.command[0]}]"
+        try:
+            while bline := self.stderr.readline():
+                print(prefix, bline.rstrip().decode())
+
+        finally:
+            # Stderr return empty character, process is terminated
+            self._stderr_closed_event.set()
+
+    def _wait_exit_task(self) -> None:
+        """call terminate() on broken child"""
+        self.process.wait()
+
+        with self._switch_lock:
+            self.terminate()
 
     def terminate(self) -> None:
         """Terminate process"""
 
-        if self._switch_lock.locked():
-            return
-
         with self._switch_lock:
-            self._terminate_process_event.clear()
-
-            if not self.process:
+            if not self._is_running:
                 return
+            self._is_running = False
 
             self.process.terminate()
             return_code = self.process.wait()
             print("process terminated with exit code", return_code)
 
             # wait until stderr closed
-            self._terminate_process_event.wait()
+            self._stderr_closed_event.wait()
             # Set to None to release 'Popen()' object from memory
             self.process = None
