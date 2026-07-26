@@ -8,7 +8,7 @@ import sublime
 import sublime_plugin
 
 from ..client_internal import BaseClient
-from ..session import ConnectionStatus, Workspace
+from ..session import SessionStatus, Workspace
 from ..uri import path_to_uri
 from ..lsprotocol.client import InitializeResult
 
@@ -318,12 +318,12 @@ class InitializerMixins(BaseClient):
     _initialized_event = threading.Event()
 
     def initialize(self, view: sublime.View):
-        if self.session.connection_status in {
-            ConnectionStatus.Connecting,
-            ConnectionStatus.Initialized,
+        if self.session.status in {
+            SessionStatus.Initializing,
+            SessionStatus.Initialized,
         }:
             return
-        self.session.connection_status = ConnectionStatus.Connecting
+        self.session.status = SessionStatus.Initializing
 
         # check if view not closed
         if view is None:
@@ -369,12 +369,12 @@ class InitializerMixins(BaseClient):
 
     def initialized(self):
         self.initialized_notification({})
-        self.session.connection_status = ConnectionStatus.Initialized
+        self.session.status = SessionStatus.Initialized
         self._initialized_event.set()
 
     def wait_initialized(self, timeout: float = 10.0) -> None:
         if not self._initialized_event.wait(timeout):
-            self.session.connection_status = ConnectionStatus.NotSet
+            self.session.status = SessionStatus.NotSet
             raise TimeoutError("initialize timed out")
 
 

@@ -18,9 +18,9 @@ PathStr = str
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
 
-class ConnectionStatus(Enum):
+class SessionStatus(Enum):
     NotSet = 0
-    Connecting = 1
+    Initializing = 1
     Initialized = 2
     Shutdown = 3
 
@@ -80,7 +80,7 @@ class Session:
     def __init__(self, **kwargs) -> None:
         self.client_capabilities: dict = {}
         self.server_capabilities: dict = {}
-        self.connection_status = ConnectionStatus.NotSet
+        self.status = SessionStatus.NotSet
 
         self.workspace_folders: List[Workspace] = []
         self.opened_documents = DocumentMap()
@@ -123,10 +123,10 @@ class Session:
         return [doc for _, doc in self.opened_documents.items() if filter_func(doc)]
 
     def is_initialized(self):
-        return self.connection_status is ConnectionStatus.Initialized
+        return self.status is SessionStatus.Initialized
 
     def reset(self):
         """"""
         self.opened_documents.clear()
         self.diagnostic_reporter.reset()
-        self.connection_status = ConnectionStatus.NotSet
+        self.status = SessionStatus.NotSet
