@@ -81,37 +81,25 @@ class Context(MutableMapping):
 
 class ProcessManager:
 
-    _start_server_lock = threading.Lock()
-
     def __init__(self, *args, **kwargs) -> None:
         self.server_process: ChildProcess
-
-    def is_server_running(self) -> bool:
-        return self.server_process and self.server_process.is_running()
 
     def start_server(
         self, command: Optional[List[str]] = None, env: Optional[dict] = None
     ) -> None:
         """"""
+        if self.server_process.is_running():
+            return
+
         # update command
         if command:
             self.server_process.command = command
 
-        # only one thread can run server
-        if self._start_server_lock.locked():
-            return
-
-        with self._start_server_lock:
-            if not self.server_process.is_running():
-                self.server_process.run(env)
-                self.connect()
+        self.server_process.run(env)
 
     def terminate(self) -> None:
         """terminate server"""
         self.server_process.terminate()
-
-    def connect(self) -> None:
-        raise NotImplementedError("not implemented method 'connect'")
 
 
 class _MessageExchangeBase:
@@ -271,6 +259,9 @@ class RPC(ClientCommand, ServerCommand, LSClient):
         self.session = Session()
 
     def connect(self) -> None:
+        if self.transport.is_connected():
+            return
+
         sublime.status_message("connecting to language server...")
         self.transport.connect()
 

@@ -1,3 +1,4 @@
+import threading
 from locale import getlocale
 from os import getpid
 from pathlib import Path
@@ -10,7 +11,6 @@ from ..client_internal import BaseClient
 from ..session import ConnectionStatus, Workspace
 from ..uri import path_to_uri
 from ..lsprotocol.client import InitializeResult
-
 
 DEFAULT_PARAMS = {
     "processId": getpid(),
@@ -315,15 +315,21 @@ DEFAULT_PARAMS = {
 
 class InitializerMixins(BaseClient):
 
+    _initialized_event = threading.Event()
+
     def initialize(self, view: sublime.View):
-        # cancel if initializing
-        if self.session.connection_status is ConnectionStatus.Connecting:
+        if self.session.connection_status in {
+            ConnectionStatus.Connecting,
+            ConnectionStatus.Initialized,
+        }:
             return
         self.session.connection_status = ConnectionStatus.Connecting
 
         # check if view not closed
         if view is None:
             return
+
+        self._initialized_event.clear()
 
         workspace_path = get_workspace_path(view)
         if not workspace_path:
@@ -364,6 +370,12 @@ class InitializerMixins(BaseClient):
     def initialized(self):
         self.initialized_notification({})
         self.session.connection_status = ConnectionStatus.Initialized
+        self._initialized_event.set()
+
+    def wait_initialized(self, timeout: float = 10.0) -> None:
+        if not self._initialized_event.wait(timeout):
+            self.session.connection_status = ConnectionStatus.NotSet
+            raise TimeoutError("initialize timed out")
 
 
 def get_workspace_path(view: sublime.View, return_parent: bool = True) -> str:

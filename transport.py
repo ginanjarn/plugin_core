@@ -79,6 +79,9 @@ class StandardIO(Transport):
         self._connect_event = Event()
 
     def connect(self) -> None:
+        if not self.server.is_running():
+            raise ConnectionError("server is not running")
+
         self._is_connected = True
         self._connect_event.set()
 
