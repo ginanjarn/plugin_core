@@ -3,7 +3,7 @@
 import time
 from collections import namedtuple
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 import sublime
 
@@ -115,7 +115,7 @@ class TextChange:
     start: RowColumn
     end: RowColumn
     text: str
-    length: int
+    length: Optional[int]
 
     __slots__ = ("start", "end", "text", "length")
 

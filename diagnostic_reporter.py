@@ -212,7 +212,7 @@ class OutputPanel:
         start = (0, 0)
         end = self.panel.rowcol(self.panel.size())
 
-        change = TextChange(start, end, text, -1)
+        change = TextChange(start, end, text, None)
         self.panel.run_command(
             f"{COMMAND_PREFIX}_apply_text_changes",
             {"changes": [asdict(change)]},

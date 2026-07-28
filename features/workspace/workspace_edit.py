@@ -115,7 +115,7 @@ def rpc_to_textchange(change: TextEdit) -> TextChange:
         LineCharacter(**change["range"]["start"]),
         LineCharacter(**change["range"]["end"]),
         change["newText"],
-        change.get("rangeLength", 0),
+        change.get("rangeLength"),
     )
 
 
