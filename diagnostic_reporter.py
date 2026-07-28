@@ -220,11 +220,14 @@ class OutputPanel:
 
     def show(self) -> None:
         """show output panel"""
-        sublime.active_window().run_command(
+        if not self.panel:
+            return
+        self.panel.window().run_command(
             "show_panel", {"panel": f"output.{self.panel_name}"}
         )
 
     def destroy(self):
         """destroy output panel"""
-        for window in sublime.windows():
-            window.destroy_output_panel(self.panel_name)
+        if not self.panel:
+            return
+        self.panel.window().destroy_output_panel(self.panel_name)
