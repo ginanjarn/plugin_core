@@ -8,9 +8,9 @@ from typing import Dict, List, Set, Callable
 import sublime
 from sublime import View
 
-from .document import TextChange
-from .sublime_settings import Settings as UserSettings
-from ..constant import PACKAGE_NAME, COMMAND_PREFIX
+from ...sublime_settings import Settings as UserSettings
+from ...document import TextChange
+from ....constant import PACKAGE_NAME, COMMAND_PREFIX
 
 
 @dataclass

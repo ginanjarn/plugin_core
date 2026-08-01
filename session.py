@@ -12,7 +12,9 @@ from sublime import View
 
 from ..constant import LOGGING_CHANNEL
 from .document import Document
-from .diagnostic_reporter import ReportManager as DiagnosticReportManager
+from .features.text_document.diagnostic_reporter import (
+    ReportManager as DiagnosticReportManager,
+)
 
 PathStr = str
 LOGGER = logging.getLogger(LOGGING_CHANNEL)

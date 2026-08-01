@@ -3,9 +3,9 @@ from collections import namedtuple
 import sublime
 from sublime import View
 
+from .diagnostic_reporter import Diagnostic
 from ...client_internal import BaseClient
 from ...uri import uri_to_path
-from ...diagnostic_reporter import Diagnostic
 from ...lsprotocol.client import PublishDiagnosticsParams
 from ...utils import on_main_thread
 
