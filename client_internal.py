@@ -9,7 +9,6 @@ from functools import wraps
 from typing import (
     Optional,
     Dict,
-    List,
     Any,
     Iterator,
     TYPE_CHECKING,
@@ -77,29 +76,6 @@ class Context(MutableMapping):
     @lock
     def __len__(self) -> int:
         return len(self.data)
-
-
-class ProcessManager:
-
-    def __init__(self, *args, **kwargs) -> None:
-        self.server_process: ChildProcess
-
-    def start_server(
-        self, command: Optional[List[str]] = None, env: Optional[dict] = None
-    ) -> None:
-        """"""
-        if self.server_process.is_running():
-            return
-
-        # update command
-        if command:
-            self.server_process.command = command
-
-        self.server_process.run(env)
-
-    def terminate(self) -> None:
-        """terminate server"""
-        self.server_process.terminate()
 
 
 class _MessageExchangeBase:
@@ -258,6 +234,10 @@ class RPC(ClientCommand, ServerCommand, LSClient):
         super().__init__(transport)
         self.session = Session()
 
+    def is_ready(self) -> bool:
+        """check client is ready"""
+        return self.transport.is_connected() and self.session.is_initialized()
+
     def connect(self) -> None:
         if self.transport.is_connected():
             return
@@ -318,7 +298,7 @@ class RPC(ClientCommand, ServerCommand, LSClient):
         return self.handle(context, method, param_or_result)
 
 
-class BaseClient(RPC, ProcessManager):
+class BaseClient(RPC):
     """"""
 
     def __init__(
@@ -328,7 +308,3 @@ class BaseClient(RPC, ProcessManager):
     ):
         super().__init__(transport)
         self.server_process = process
-
-    def is_ready(self) -> bool:
-        """check client is ready"""
-        return self.transport.is_connected() and self.session.is_initialized()

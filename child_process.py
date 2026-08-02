@@ -68,7 +68,11 @@ class ChildProcess:
         with self._switch_lock:
             return self._is_running
 
-    def run(self, env: Optional[dict] = None) -> None:
+    def run(
+        self,
+        command: Optional[List[str]] = None,
+        env: Optional[dict] = None,
+    ) -> None:
         """Run process"""
 
         with self._switch_lock:
@@ -76,10 +80,11 @@ class ChildProcess:
             if self._is_running:
                 return
 
+            _command = command or self.command
             print("execute '%s'" % shlex.join(self.command))
 
             self.process = subprocess.Popen(
-                self.command,
+                _command,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

@@ -30,7 +30,7 @@ class _StartServerCommand(sublime_plugin.TextCommand):
 
         with self._run_lock:
             try:
-                self.client.start_server(command, envs)
+                self.client.server_process.run(command, envs)
                 self.client.connect()
 
                 self.client.initialize(self.view)
