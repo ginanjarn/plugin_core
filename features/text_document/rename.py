@@ -4,13 +4,17 @@ import sublime
 import sublime_plugin
 
 from ...client_internal import BaseClient
-from ...document import is_valid_document
 from ...uri import path_to_uri
 from ...features.workspace.workspace_edit import WorkspaceEdit
 from ...lsprotocol.client import PrepareRenameResult, WorkspaceEdit as LspWorkspaceEdit
-from ...utils import client_must_ready, on_main_thread, on_new_thread
+from ...utils import (
+    client_must_ready,
+    is_valid_document,
+    must_valid_document,
+    on_main_thread,
+    on_new_thread,
+)
 from ....constant import COMMAND_PREFIX
-
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
@@ -100,10 +104,8 @@ class _PrepareRenameCommand(sublime_plugin.TextCommand):
     client: DocumentRenameMixins = None
 
     @client_must_ready
+    @must_valid_document
     def run(self, edit: sublime.Edit, event: Optional[dict] = None):
-        if not is_valid_document(self.view):
-            return
-
         try:
             point = event["text_point"]
         except (AttributeError, KeyError):
@@ -123,9 +125,8 @@ class _RenameCommand(sublime_plugin.TextCommand):
     client: DocumentRenameMixins = None
 
     @client_must_ready
+    @must_valid_document
     def run(self, edit: sublime.Edit, row: int, column: int, new_name: str):
-        if not is_valid_document(self.view):
-            return
         self.client.textdocument_rename(self.view, row, column, new_name)
 
     def is_visible(self):

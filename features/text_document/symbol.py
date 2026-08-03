@@ -4,11 +4,15 @@ import sublime
 import sublime_plugin
 
 from ...client_internal import BaseClient
-from ...document import is_valid_document
 from ...uri import path_to_uri, uri_to_path
-from ...utils import client_must_ready, on_main_thread, on_new_thread
+from ...utils import (
+    client_must_ready,
+    is_valid_document,
+    must_valid_document,
+    on_main_thread,
+    on_new_thread,
+)
 from ...lsprotocol.client import SymbolInformation, DocumentSymbol
-
 
 PathEncodedStr = str
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
@@ -108,9 +112,8 @@ class _DocumentSymbolCommand(sublime_plugin.TextCommand):
     client: DocumentSymbolMixins = None
 
     @client_must_ready
+    @must_valid_document
     def run(self, edit: sublime.Edit):
-        if not is_valid_document(self.view):
-            return
         self.client.textdocument_symbol(self.view)
 
     def is_visible(self):

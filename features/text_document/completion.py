@@ -5,9 +5,13 @@ import sublime
 import sublime_plugin
 
 from ...client_internal import BaseClient
-from ...document import is_valid_document
 from ...uri import path_to_uri
-from ...utils import client_must_ready, on_main_thread, on_new_thread
+from ...utils import (
+    client_must_ready,
+    must_valid_document,
+    on_main_thread,
+    on_new_thread,
+)
 from ...lsprotocol.client import CompletionList, CompletionItem
 
 
@@ -133,11 +137,10 @@ class CompletionEventListener(sublime_plugin.ViewEventListener):
         self.prev_trigger_location = 0
 
     @client_must_ready
+    @must_valid_document
     def on_query_completions(
         self, prefix: str, locations: List[int]
     ) -> sublime.CompletionList:
-        if not is_valid_document(self.view):
-            return None
 
         # trigger on first location
         location = min(locations)

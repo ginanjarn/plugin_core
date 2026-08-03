@@ -10,6 +10,7 @@ import sublime_plugin
 from ..client_internal import BaseClient
 from ..session import SessionStatus, Workspace
 from ..uri import path_to_uri
+from ..utils import client_must_ready, must_valid_document
 from ..lsprotocol.client import InitializeResult
 
 DEFAULT_PARAMS = {
@@ -410,5 +411,7 @@ class _InitializeCommand(sublime_plugin.TextCommand):
 
     client: InitializerMixins = None
 
+    @client_must_ready
+    @must_valid_document
     def run(self, edit: sublime.Edit):
         self.client.initialize(self.view)

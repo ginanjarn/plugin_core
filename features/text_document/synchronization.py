@@ -3,9 +3,13 @@ import sublime
 import sublime_plugin
 
 from ...client_internal import BaseClient
-from ...document import Document, is_valid_document, TextChange
+from ...document import Document, TextChange
 from ...uri import path_to_uri
-from ...utils import client_must_ready
+from ...utils import (
+    client_must_ready,
+    is_valid_document,
+    must_valid_document,
+)
 from ...lsprotocol.lsprotocol import TextDocumentContentChangePartial
 
 
@@ -128,23 +132,15 @@ class SynchronizeEventAdapter:
     client: DocumentSynchronizerMixins = None
 
     def didopen(self, view: sublime.View, *, reload: bool = False):
-        if not is_valid_document(view):
-            return
         self.client.textdocument_didopen(view, reload=reload)
 
     def didsave(self, view: sublime.View):
-        if not is_valid_document(view):
-            return
         self.client.textdocument_didsave(view)
 
     def didclose(self, view: sublime.View):
-        if not is_valid_document(view):
-            return
         self.client.textdocument_didclose(view)
 
     def didchange(self, view: sublime.View, changes: List[TextChange]):
-        if not is_valid_document(view):
-            return
         self.client.textdocument_didchange(view, changes)
 
 
@@ -153,26 +149,32 @@ class DocumentSynchronizeEventListener(
 ):
 
     @client_must_ready
+    @must_valid_document
     def on_activated_async(self):
         self.didopen(self.view)
 
     @client_must_ready
+    @must_valid_document
     def on_load_async(self):
         self.didopen(self.view, reload=True)
 
     @client_must_ready
+    @must_valid_document
     def on_reload_async(self):
         self.didopen(self.view, reload=True)
 
     @client_must_ready
+    @must_valid_document
     def on_revert_async(self):
         self.didopen(self.view, reload=True)
 
     @client_must_ready
+    @must_valid_document
     def on_post_save_async(self):
         self.didsave(self.view)
 
     @client_must_ready
+    @must_valid_document
     def on_close(self):
         self.didclose(self.view)
 

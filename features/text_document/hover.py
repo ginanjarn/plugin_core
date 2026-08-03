@@ -5,9 +5,14 @@ import sublime
 import sublime_plugin
 
 from ...client_internal import BaseClient
-from ...document import Document, is_valid_document
+from ...document import Document
 from ...uri import path_to_uri
-from ...utils import client_must_ready, on_main_thread, on_new_thread
+from ...utils import (
+    client_must_ready,
+    must_valid_document,
+    on_main_thread,
+    on_new_thread,
+)
 from ...lsprotocol.client import Hover
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
@@ -121,10 +126,9 @@ class HoverEventListener(sublime_plugin.ViewEventListener):
     client: DocumentHoverMixins = None
 
     @client_must_ready
+    @must_valid_document
     def on_hover(self, point: int, hover_zone: sublime.HoverZone):
         if hover_zone != sublime.HoverZone.TEXT:
-            return
-        if not is_valid_document(self.view):
             return
         row, col = self.view.rowcol(point)
         self._on_hover_task(self.view, row, col)

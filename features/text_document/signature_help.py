@@ -4,9 +4,8 @@ import sublime
 import sublime_plugin
 
 from ...client_internal import BaseClient
-from ...document import is_valid_document
 from ...uri import path_to_uri
-from ...utils import client_must_ready, on_main_thread, on_new_thread
+from ...utils import client_must_ready,is_valid_document, must_valid_document, on_main_thread, on_new_thread
 from ...lsprotocol.client import SignatureHelp
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
@@ -87,10 +86,8 @@ class DocumentSignatureHelpEventListener(sublime_plugin.ViewEventListener):
     insert_commands = {"insert", "insert_snippet", "insert_completion"}
 
     @client_must_ready
+    @must_valid_document
     def on_modified_async(self) -> None:
-        if not is_valid_document(self.view):
-            return
-
         name, *_ = self.view.command_history(0)
         if name not in self.insert_commands:
             return

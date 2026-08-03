@@ -3,10 +3,15 @@ import sublime
 import sublime_plugin
 
 from ...client_internal import BaseClient
-from ...document import is_valid_document
 from ...features.workspace.workspace_edit import WorkspaceEdit
 from ...uri import path_to_uri
-from ...utils import client_must_ready, on_main_thread, on_new_thread
+from ...utils import (
+    client_must_ready,
+    is_valid_document,
+    must_valid_document,
+    on_main_thread,
+    on_new_thread,
+)
 from ...lsprotocol.client import TextEdit
 
 
@@ -41,9 +46,8 @@ class _DocumentFormattingCommand(sublime_plugin.TextCommand):
     client: DocumentFormattingMixins = None
 
     @client_must_ready
+    @must_valid_document
     def run(self, edit: sublime.Edit):
-        if not is_valid_document(self.view):
-            return
         self.client.textdocument_formatting(self.view)
 
     def is_visible(self):
