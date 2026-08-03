@@ -9,7 +9,6 @@ from ...uri import path_to_uri
 from ...utils import client_must_ready, on_main_thread, on_new_thread
 from ...lsprotocol.client import SignatureHelp
 
-
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
 
@@ -82,25 +81,25 @@ class _DocumentSignatureHelpCommand(sublime_plugin.TextCommand):
         self.client.textdocument_signaturehelp(self.view, row, column)
 
 
-class DocumentSignatureHelpEventListener(sublime_plugin.EventListener):
+class DocumentSignatureHelpEventListener(sublime_plugin.ViewEventListener):
     client: DocumentSignatureHelpMixins = None
     _trigger_characters = []
     insert_commands = {"insert", "insert_snippet", "insert_completion"}
 
     @client_must_ready
-    def on_modified_async(self, view: sublime.View) -> None:
-        if not is_valid_document(view):
+    def on_modified_async(self) -> None:
+        if not is_valid_document(self.view):
             return
 
-        name, *_ = view.command_history(0)
+        name, *_ = self.view.command_history(0)
         if name not in self.insert_commands:
             return
 
-        point = view.sel()[0].begin()
-        char = view.substr(point - 1)
+        point = self.view.sel()[0].begin()
+        char = self.view.substr(point - 1)
         if char in self.trigger_characters:
-            row, column = view.rowcol(point)
-            self.client.textdocument_signaturehelp(view, row, column)
+            row, column = self.view.rowcol(point)
+            self.client.textdocument_signaturehelp(self.view, row, column)
 
     @property
     def trigger_characters(self) -> str:

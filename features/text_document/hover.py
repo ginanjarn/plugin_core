@@ -10,7 +10,6 @@ from ...uri import path_to_uri
 from ...utils import client_must_ready, on_main_thread, on_new_thread
 from ...lsprotocol.client import Hover
 
-
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
 
@@ -118,17 +117,17 @@ class DocumentHoverMixins(BaseClient):
         return "\n".join([f"- {escape_html(build_message(d))}" for d in items])
 
 
-class HoverEventListener(sublime_plugin.EventListener):
+class HoverEventListener(sublime_plugin.ViewEventListener):
     client: DocumentHoverMixins = None
 
     @client_must_ready
-    def on_hover(self, view: sublime.View, point: int, hover_zone: sublime.HoverZone):
+    def on_hover(self, point: int, hover_zone: sublime.HoverZone):
         if hover_zone != sublime.HoverZone.TEXT:
             return
-        if not is_valid_document(view):
+        if not is_valid_document(self.view):
             return
-        row, col = view.rowcol(point)
-        self._on_hover_task(view, row, col)
+        row, col = self.view.rowcol(point)
+        self._on_hover_task(self.view, row, col)
 
     def _on_hover_task(self, view: sublime.View, row: int, col: int):
         # Hover may be not in current active document, open it

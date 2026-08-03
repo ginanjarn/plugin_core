@@ -149,40 +149,32 @@ class SynchronizeEventAdapter:
 
 
 class DocumentSynchronizeEventListener(
-    SynchronizeEventAdapter, sublime_plugin.EventListener
+    SynchronizeEventAdapter, sublime_plugin.ViewEventListener
 ):
 
     @client_must_ready
-    def on_activated_async(self, view: sublime.View):
-        self.didopen(view)
+    def on_activated_async(self):
+        self.didopen(self.view)
 
     @client_must_ready
-    def on_load_async(self, view: sublime.View):
-        self.didopen(view, reload=True)
+    def on_load_async(self):
+        self.didopen(self.view, reload=True)
 
     @client_must_ready
-    def on_reload_async(self, view: sublime.View):
-        self.didopen(view, reload=True)
+    def on_reload_async(self):
+        self.didopen(self.view, reload=True)
 
     @client_must_ready
-    def on_revert_async(self, view: sublime.View):
-        self.didopen(view, reload=True)
+    def on_revert_async(self):
+        self.didopen(self.view, reload=True)
 
     @client_must_ready
-    def on_post_save_async(self, view: sublime.View):
-        self.didsave(view)
+    def on_post_save_async(self):
+        self.didsave(self.view)
 
     @client_must_ready
-    def on_close(self, view: sublime.View):
-        self.didclose(view)
-
-    @client_must_ready
-    def on_associate_buffer_async(self, buffer: sublime.Buffer):
-        # close all associated buffer
-        for view in buffer.views():
-            self.didclose(view)
-        # then reopen active view
-        self.didopen(buffer.primary_view())
+    def on_close(self):
+        self.didclose(self.view)
 
 
 class DocumentSynchronizeTextChangeListener(

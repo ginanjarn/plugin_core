@@ -125,7 +125,7 @@ class DocumentCompletionMixins(BaseClient):
         )
 
 
-class CompletionEventListener(sublime_plugin.EventListener):
+class CompletionEventListener(sublime_plugin.ViewEventListener):
     client: DocumentCompletionMixins = None
 
     def __init__(self, *args, **kwargs):
@@ -134,9 +134,9 @@ class CompletionEventListener(sublime_plugin.EventListener):
 
     @client_must_ready
     def on_query_completions(
-        self, view: sublime.View, prefix: str, locations: List[int]
+        self, prefix: str, locations: List[int]
     ) -> sublime.CompletionList:
-        if not is_valid_document(view):
+        if not is_valid_document(self.view):
             return None
 
         # trigger on first location
@@ -145,18 +145,18 @@ class CompletionEventListener(sublime_plugin.EventListener):
         if self.client.is_completions_available():
             items = self.client.pop_completions()
             if (not items) or self._is_context_changed(
-                view, self.prev_trigger_location, location
+                self.view, self.prev_trigger_location, location
             ):
-                self.hide_completions(view)
+                self.hide_completions(self.view)
                 return None
 
             return sublime.CompletionList(items, flags=sublime.INHIBIT_WORD_COMPLETIONS)
 
         self.prev_trigger_location = location
 
-        row, col = view.rowcol(location)
-        self.client.textdocument_completion(view, row, col)
-        self.hide_completions(view)
+        row, col = self.view.rowcol(location)
+        self.client.textdocument_completion(self.view, row, col)
+        self.hide_completions(self.view)
 
         return None
 
