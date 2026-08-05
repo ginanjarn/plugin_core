@@ -14,7 +14,6 @@ from ...utils import (
     on_main_thread,
     on_new_thread,
 )
-from ....constant import COMMAND_PREFIX
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
@@ -58,10 +57,7 @@ class DocumentRenameMixins(BaseClient):
 
         def request_rename(new_name):
             if new_name and old_name != new_name:
-                view.run_command(
-                    f"{COMMAND_PREFIX}_rename",
-                    {"row": row, "column": col, "new_name": new_name},
-                )
+                self.textdocument_rename(view, row, col, new_name)
 
         view.window().show_input_panel(
             caption="Rename",
