@@ -29,8 +29,7 @@ class _ApplyTextChangesCommand(sublime_plugin.TextCommand):
     def apply(self, edit: sublime.Edit, text_changes: List[_BufferedTextChange]):
         # Apply text_changes from last to begin to ensure text changes don't
         # break change location
-        text_changes = sorted(text_changes, key=lambda c: c.region, reverse=True)
-        for change in text_changes:
+        for change in reversed(text_changes):
             self.view.replace(edit, change.region, change.new_text)
 
     def to_text_change(self, change: dict) -> _BufferedTextChange:

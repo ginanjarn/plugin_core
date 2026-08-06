@@ -149,8 +149,7 @@ class TextFile:
 
         # Apply text_changes from last to begin to ensure text changes don't
         # break change location
-        text_changes = sorted(text_changes, key=lambda c: c.start, reverse=True)
-        for change in text_changes:
+        for change in reversed(text_changes):
             srow, scol = change.start
             erow, ecol = change.end
 
