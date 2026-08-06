@@ -5,11 +5,11 @@ from typing import List, Dict, Union
 
 import sublime
 
-from ...document import TextChange
-from ...session import Session
-from ...uri import uri_to_path
-from ...lsprotocol.lsprotocol import (
-    WorkspaceEdit as LspWorkspaceEdit,
+from ..document import TextChange
+from ..session import Session
+from ..uri import uri_to_path
+from ..lsprotocol.lsprotocol import (
+    WorkspaceEdit,
     TextEdit,
     DocumentUri,
     TextDocumentEdit,
@@ -17,27 +17,27 @@ from ...lsprotocol.lsprotocol import (
     RenameFile,
     DeleteFile,
 )
-from ....constant import COMMAND_PREFIX
+from ...constant import COMMAND_PREFIX
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 PathStr = str
 
 
-class WorkspaceEdit:
-    """WorkspaceEdit"""
+class WorkspaceUpdater:
+    """Workspace Updater"""
 
     def __init__(self, session: Session):
         self.session = session
 
-    def apply(self, edit: LspWorkspaceEdit):
+    def apply(self, edit: WorkspaceEdit):
         if changes := edit.get("changes"):
             self._apply_changes(changes)
         if document_changes := edit.get("documentChanges"):
             self.apply_document_changes(document_changes)
 
     def _apply_changes(self, changes: Dict[DocumentUri, List[TextEdit]]):
-        for uri, text_edit in changes.items():
-            self.apply_text_edit(uri_to_path(uri), text_edit)
+        for uri, text_edits in changes.items():
+            self.apply_text_edits(uri_to_path(uri), text_edits)
 
     def apply_document_changes(
         self, changes: List[Union[TextDocumentEdit, CreateFile, RenameFile, DeleteFile]]
@@ -62,9 +62,9 @@ class WorkspaceEdit:
     def _apply_text_document_edit(self, text_document_edit: TextDocumentEdit):
         file_name = uri_to_path(text_document_edit["textDocument"]["uri"])
         edits = text_document_edit["edits"]
-        self.apply_text_edit(file_name, edits)
+        self.apply_text_edits(file_name, edits)
 
-    def apply_text_edit(self, file_name: str, edits: List[TextEdit]):
+    def apply_text_edits(self, file_name: str, edits: List[TextEdit]):
         text_changes = [rpc_to_textchange(c) for c in edits]
         if document := self.session.get_document_with_name(file_name):
             view = document.view
@@ -107,6 +107,16 @@ class WorkspaceEdit:
             v for v in sublime.active_window().views() if v.file_name() == file_name
         ]:
             view.close()
+
+
+def apply_workspace_edit(session: Session, edit: WorkspaceEdit) -> None:
+    """apply workspace_edit"""
+    WorkspaceUpdater(session).apply(edit)
+
+
+def apply_text_edits(session: Session, file_name: str, edits: List[TextEdit]) -> None:
+    """apply text_edits"""
+    WorkspaceUpdater(session).apply_text_edits(file_name, edits)
 
 
 def rpc_to_textchange(change: TextEdit) -> TextChange:

@@ -2,6 +2,7 @@ from typing import List, Optional, Union
 import sublime
 import sublime_plugin
 
+from ..workspace_updater import apply_workspace_edit
 from ...client_internal import BaseClient
 from ...uri import path_to_uri
 from ...utils import (
@@ -11,7 +12,6 @@ from ...utils import (
     on_main_thread,
     on_new_thread,
 )
-from ...features.workspace.workspace_edit import WorkspaceEdit
 from ...lsprotocol.client import Command, CodeAction
 
 
@@ -83,7 +83,7 @@ class DocumentCodeActionMixins(BaseClient):
         self, context: dict, action: Union[Command, CodeAction]
     ) -> None:
         if edit := action.get("edit"):
-            WorkspaceEdit(self.session).apply(edit)
+            apply_workspace_edit(self.session, edit)
         elif command := action.get("command"):
             self.workspace_executecommand(command)
         else:

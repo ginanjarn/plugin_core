@@ -2,8 +2,8 @@ from typing import List, Union
 import sublime
 import sublime_plugin
 
+from ..workspace_updater import apply_text_edits
 from ...client_internal import BaseClient
-from ...features.workspace.workspace_edit import WorkspaceEdit
 from ...uri import path_to_uri
 from ...utils import (
     client_must_ready,
@@ -37,9 +37,7 @@ class DocumentFormattingMixins(BaseClient):
     ) -> None:
         if not result:
             return
-        WorkspaceEdit(self.session).apply_text_edit(
-            self.formatting_target.file_name, result
-        )
+        apply_text_edits(self.session, self.formatting_target.file_name, result)
 
 
 class _DocumentFormattingCommand(sublime_plugin.TextCommand):

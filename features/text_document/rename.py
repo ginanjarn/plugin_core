@@ -3,9 +3,9 @@ from typing import Optional, Union
 import sublime
 import sublime_plugin
 
+from ..workspace_updater import apply_workspace_edit
 from ...client_internal import BaseClient
 from ...uri import path_to_uri
-from ...features.workspace.workspace_edit import WorkspaceEdit
 from ...lsprotocol.client import PrepareRenameResult, WorkspaceEdit as LspWorkspaceEdit
 from ...utils import (
     client_must_ready,
@@ -93,7 +93,7 @@ class DocumentRenameMixins(BaseClient):
     ) -> None:
         if not result:
             return
-        WorkspaceEdit(self.session).apply(result)
+        apply_workspace_edit(self.session, result)
 
 
 class _PrepareRenameCommand(sublime_plugin.TextCommand):
