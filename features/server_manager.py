@@ -3,12 +3,11 @@ from typing import List, Optional
 import sublime
 import sublime_plugin
 
-from ..client import Client
+from .plugin_base import PluginBase
 
 
-class _StartServerCommand(sublime_plugin.TextCommand):
+class _StartServerCommand(PluginBase, sublime_plugin.TextCommand):
 
-    client: Client = None
     _run_lock = threading.Lock()
 
     def run(
@@ -47,9 +46,7 @@ class _StartServerCommand(sublime_plugin.TextCommand):
         return not self.client.is_ready()
 
 
-class _TerminateServerCommand(sublime_plugin.TextCommand):
-
-    client: Client = None
+class _TerminateServerCommand(PluginBase, sublime_plugin.TextCommand):
 
     def run(self, edit: sublime.Edit):
         self.client.disconnect()

@@ -2,11 +2,11 @@ from typing import List, Optional, Union
 import sublime
 import sublime_plugin
 
+from ..plugin_base import PluginBase, client_must_ready
 from ..workspace_updater import apply_workspace_edit
 from ...client_internal import BaseClient
 from ...uri import path_to_uri
 from ...utils import (
-    client_must_ready,
     is_valid_document,
     must_valid_document,
     on_main_thread,
@@ -100,8 +100,8 @@ class DocumentCodeActionMixins(BaseClient):
         self._handle_code_action(self.session, result)
 
 
-class _CodeActionCommand(sublime_plugin.TextCommand):
-    client: DocumentCodeActionMixins = None
+class _CodeActionCommand(PluginBase, sublime_plugin.TextCommand):
+    client: DocumentCodeActionMixins
 
     @client_must_ready
     @must_valid_document

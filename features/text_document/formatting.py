@@ -2,11 +2,11 @@ from typing import List, Union
 import sublime
 import sublime_plugin
 
+from ..plugin_base import PluginBase, client_must_ready
 from ..workspace_updater import apply_text_edits
 from ...client_internal import BaseClient
 from ...uri import path_to_uri
 from ...utils import (
-    client_must_ready,
     is_valid_document,
     must_valid_document,
     on_main_thread,
@@ -40,8 +40,8 @@ class DocumentFormattingMixins(BaseClient):
         apply_text_edits(self.session, self.formatting_target.file_name, result)
 
 
-class _DocumentFormattingCommand(sublime_plugin.TextCommand):
-    client: DocumentFormattingMixins = None
+class _DocumentFormattingCommand(PluginBase, sublime_plugin.TextCommand):
+    client: DocumentFormattingMixins
 
     @client_must_ready
     @must_valid_document

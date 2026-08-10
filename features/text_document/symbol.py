@@ -3,10 +3,10 @@ from typing import List, Union
 import sublime
 import sublime_plugin
 
+from ..plugin_base import PluginBase, client_must_ready
 from ...client_internal import BaseClient
 from ...uri import path_to_uri, uri_to_path
 from ...utils import (
-    client_must_ready,
     is_valid_document,
     must_valid_document,
     on_main_thread,
@@ -108,8 +108,8 @@ class SymbolSelector:
         self.active_view.show(self.visible_region)
 
 
-class _DocumentSymbolCommand(sublime_plugin.TextCommand):
-    client: DocumentSymbolMixins = None
+class _DocumentSymbolCommand(PluginBase, sublime_plugin.TextCommand):
+    client: DocumentSymbolMixins
 
     @client_must_ready
     @must_valid_document

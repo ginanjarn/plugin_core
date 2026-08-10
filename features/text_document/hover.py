@@ -4,11 +4,11 @@ from typing import Union
 import sublime
 import sublime_plugin
 
+from ..plugin_base import PluginBase, client_must_ready
 from ...client_internal import BaseClient
 from ...document import Document
 from ...uri import path_to_uri
 from ...utils import (
-    client_must_ready,
     must_valid_document,
     on_main_thread,
     on_new_thread,
@@ -122,8 +122,8 @@ class DocumentHoverMixins(BaseClient):
         return "\n".join([f"- {escape_html(build_message(d))}" for d in items])
 
 
-class HoverEventListener(sublime_plugin.ViewEventListener):
-    client: DocumentHoverMixins = None
+class HoverEventListener(PluginBase, sublime_plugin.ViewEventListener):
+    client: DocumentHoverMixins
 
     @client_must_ready
     @must_valid_document

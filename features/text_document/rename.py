@@ -3,12 +3,12 @@ from typing import Optional, Union
 import sublime
 import sublime_plugin
 
+from ..plugin_base import PluginBase, client_must_ready
 from ..workspace_updater import apply_workspace_edit
 from ...client_internal import BaseClient
 from ...uri import path_to_uri
 from ...lsprotocol.client import PrepareRenameResult, WorkspaceEdit as LspWorkspaceEdit
 from ...utils import (
-    client_must_ready,
     is_valid_document,
     must_valid_document,
     on_main_thread,
@@ -96,8 +96,8 @@ class DocumentRenameMixins(BaseClient):
         apply_workspace_edit(self.session, result)
 
 
-class _PrepareRenameCommand(sublime_plugin.TextCommand):
-    client: DocumentRenameMixins = None
+class _PrepareRenameCommand(PluginBase, sublime_plugin.TextCommand):
+    client: DocumentRenameMixins
 
     @client_must_ready
     @must_valid_document
@@ -117,8 +117,8 @@ class _PrepareRenameCommand(sublime_plugin.TextCommand):
         return True
 
 
-class _RenameCommand(sublime_plugin.TextCommand):
-    client: DocumentRenameMixins = None
+class _RenameCommand(PluginBase, sublime_plugin.TextCommand):
+    client: DocumentRenameMixins
 
     @client_must_ready
     @must_valid_document

@@ -2,9 +2,10 @@ from typing import Union
 import logging
 import sublime_plugin
 
+from ..plugin_base import client_must_ready
 from ...client_internal import BaseClient
 from ...lsprotocol.client import LSPAny
-from ...utils import client_must_ready, on_main_thread, on_new_thread
+from ...utils import on_main_thread, on_new_thread
 from ....constant import LOGGING_CHANNEL
 
 LOGGER = logging.getLogger(LOGGING_CHANNEL)

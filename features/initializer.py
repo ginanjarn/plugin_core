@@ -7,10 +7,11 @@ from uuid import uuid4
 import sublime
 import sublime_plugin
 
+from .plugin_base import PluginBase, client_must_ready
 from ..client_internal import BaseClient
 from ..session import SessionStatus, Workspace
 from ..uri import path_to_uri
-from ..utils import client_must_ready, must_valid_document
+from ..utils import must_valid_document
 from ..lsprotocol.client import InitializeResult
 
 DEFAULT_PARAMS = {
@@ -407,9 +408,9 @@ def get_workspace_path(view: sublime.View, return_parent: bool = True) -> str:
     return str(Path(file_name).parent)
 
 
-class _InitializeCommand(sublime_plugin.TextCommand):
+class _InitializeCommand(PluginBase, sublime_plugin.TextCommand):
 
-    client: InitializerMixins = None
+    client: InitializerMixins
 
     @client_must_ready
     @must_valid_document

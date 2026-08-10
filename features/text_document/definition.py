@@ -3,10 +3,10 @@ from typing import Optional, List, Union
 import sublime
 import sublime_plugin
 
+from ..plugin_base import PluginBase, client_must_ready
 from ...client_internal import BaseClient
 from ...uri import path_to_uri, uri_to_path
 from ...utils import (
-    client_must_ready,
     is_valid_document,
     must_valid_document,
     on_main_thread,
@@ -107,8 +107,8 @@ class LocationSelector:
         self.current_view.show(self._visible_region)
 
 
-class _GotoDefinitionCommand(sublime_plugin.TextCommand):
-    client: DocumentDefinitionMixins = None
+class _GotoDefinitionCommand(PluginBase, sublime_plugin.TextCommand):
+    client: DocumentDefinitionMixins
 
     @client_must_ready
     @must_valid_document

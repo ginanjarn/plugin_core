@@ -2,14 +2,11 @@ from typing import List
 import sublime
 import sublime_plugin
 
+from ..plugin_base import PluginBase, client_must_ready
 from ...client_internal import BaseClient
 from ...document import Document, TextChange
 from ...uri import path_to_uri
-from ...utils import (
-    client_must_ready,
-    is_valid_document,
-    must_valid_document,
-)
+from ...utils import is_valid_document, must_valid_document
 from ...lsprotocol.lsprotocol import TextDocumentContentChangePartial
 
 
@@ -128,8 +125,8 @@ class DocumentSynchronizerMixins(BaseClient):
         }
 
 
-class SynchronizeEventAdapter:
-    client: DocumentSynchronizerMixins = None
+class SynchronizeEventAdapter(PluginBase):
+    client: DocumentSynchronizerMixins
 
     def didopen(self, view: sublime.View, *, reload: bool = False):
         self.client.textdocument_didopen(view, reload=reload)

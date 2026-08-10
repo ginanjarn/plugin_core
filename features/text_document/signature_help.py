@@ -3,9 +3,15 @@ from typing import Union
 import sublime
 import sublime_plugin
 
+from ..plugin_base import PluginBase, client_must_ready
 from ...client_internal import BaseClient
 from ...uri import path_to_uri
-from ...utils import client_must_ready,is_valid_document, must_valid_document, on_main_thread, on_new_thread
+from ...utils import (
+    is_valid_document,
+    must_valid_document,
+    on_main_thread,
+    on_new_thread,
+)
 from ...lsprotocol.client import SignatureHelp
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
@@ -67,8 +73,8 @@ class DocumentSignatureHelpMixins(BaseClient):
         )
 
 
-class _DocumentSignatureHelpCommand(sublime_plugin.TextCommand):
-    client: DocumentSignatureHelpMixins = None
+class _DocumentSignatureHelpCommand(PluginBase, sublime_plugin.TextCommand):
+    client: DocumentSignatureHelpMixins
 
     @client_must_ready
     def run(self, edit: sublime.Edit):
@@ -80,8 +86,8 @@ class _DocumentSignatureHelpCommand(sublime_plugin.TextCommand):
         self.client.textdocument_signaturehelp(self.view, row, column)
 
 
-class DocumentSignatureHelpEventListener(sublime_plugin.ViewEventListener):
-    client: DocumentSignatureHelpMixins = None
+class DocumentSignatureHelpEventListener(PluginBase, sublime_plugin.ViewEventListener):
+    client: DocumentSignatureHelpMixins
     _trigger_characters = []
     insert_commands = {"insert", "insert_snippet", "insert_completion"}
 

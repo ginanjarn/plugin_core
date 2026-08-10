@@ -4,10 +4,10 @@ from typing import List, Union
 import sublime
 import sublime_plugin
 
+from ..plugin_base import PluginBase, client_must_ready
 from ...client_internal import BaseClient
 from ...uri import path_to_uri
 from ...utils import (
-    client_must_ready,
     must_valid_document,
     on_main_thread,
     on_new_thread,
@@ -129,8 +129,8 @@ class DocumentCompletionMixins(BaseClient):
         )
 
 
-class CompletionEventListener(sublime_plugin.ViewEventListener):
-    client: DocumentCompletionMixins = None
+class CompletionEventListener(PluginBase, sublime_plugin.ViewEventListener):
+    client: DocumentCompletionMixins
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
