@@ -1,25 +1,6 @@
 from functools import wraps
 import sublime
 
-from ..constant import VIEW_SELECTOR
-
-
-def is_valid_document(view: sublime.View) -> bool:
-    """check if view is valid document"""
-    return bool(view.file_name()) and view.match_selector(0, VIEW_SELECTOR)
-
-
-def must_valid_document(func):
-    """document must valid to call function"""
-
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if is_valid_document(self.view):
-            return func(self, *args, **kwargs)
-        return None
-
-    return wrapper
-
 
 def on_main_thread(func):
     """exec on main thread"""

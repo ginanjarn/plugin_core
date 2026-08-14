@@ -4,14 +4,14 @@ from typing import List, Union
 import sublime
 import sublime_plugin
 
-from ..plugin_base import PluginBase, client_must_ready
+from ..plugin_base import (
+    PluginBase,
+    client_must_ready,
+    must_valid_document,
+)
 from ...client_internal import BaseClient
 from ...uri import path_to_uri
-from ...utils import (
-    must_valid_document,
-    on_main_thread,
-    on_new_thread,
-)
+from ...utils import on_main_thread, on_new_thread
 from ...lsprotocol.client import CompletionList, CompletionItem
 
 

@@ -3,17 +3,17 @@ from typing import Optional, Union
 import sublime
 import sublime_plugin
 
-from ..plugin_base import PluginBase, client_must_ready
+from ..plugin_base import (
+    PluginBase,
+    client_must_ready,
+    is_valid_document,
+    must_valid_document,
+)
 from ..workspace_updater import apply_workspace_edit
 from ...client_internal import BaseClient
 from ...uri import path_to_uri
 from ...lsprotocol.client import PrepareRenameResult, WorkspaceEdit as LspWorkspaceEdit
-from ...utils import (
-    is_valid_document,
-    must_valid_document,
-    on_main_thread,
-    on_new_thread,
-)
+from ...utils import on_main_thread, on_new_thread
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 

@@ -3,15 +3,15 @@ from typing import List, Union
 import sublime
 import sublime_plugin
 
-from ..plugin_base import PluginBase, client_must_ready
-from ...client_internal import BaseClient
-from ...uri import path_to_uri, uri_to_path
-from ...utils import (
+from ..plugin_base import (
+    PluginBase,
+    client_must_ready,
     is_valid_document,
     must_valid_document,
-    on_main_thread,
-    on_new_thread,
 )
+from ...client_internal import BaseClient
+from ...uri import path_to_uri, uri_to_path
+from ...utils import on_main_thread, on_new_thread
 from ...lsprotocol.client import SymbolInformation, DocumentSymbol
 
 PathEncodedStr = str

@@ -2,11 +2,15 @@ from typing import List
 import sublime
 import sublime_plugin
 
-from ..plugin_base import PluginBase, client_must_ready
+from ..plugin_base import (
+    PluginBase,
+    client_must_ready,
+    is_valid_document,
+    must_valid_document,
+)
 from ...client_internal import BaseClient
 from ...document import Document, TextChange
 from ...uri import path_to_uri
-from ...utils import is_valid_document, must_valid_document
 from ...lsprotocol.lsprotocol import TextDocumentContentChangePartial
 
 

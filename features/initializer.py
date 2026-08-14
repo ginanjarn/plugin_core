@@ -7,11 +7,14 @@ from uuid import uuid4
 import sublime
 import sublime_plugin
 
-from .plugin_base import PluginBase, client_must_ready
+from .plugin_base import (
+    PluginBase,
+    client_must_ready,
+    must_valid_document,
+)
 from ..client_internal import BaseClient
 from ..session import SessionStatus, Workspace
 from ..uri import path_to_uri
-from ..utils import must_valid_document
 from ..lsprotocol.client import InitializeResult
 
 DEFAULT_PARAMS = {
