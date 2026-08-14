@@ -7,14 +7,6 @@ from typing import List, Optional
 
 import sublime
 
-from ..constant import VIEW_SELECTOR
-
-
-def is_valid_document(view: sublime.View) -> bool:
-    """check if view is valid document"""
-    return bool(view.file_name()) and view.match_selector(0, VIEW_SELECTOR)
-
-
 LANGUAGE_MAP = {
     "source.c": "c",
     "source.c++": "cpp",
