@@ -33,7 +33,7 @@ from .message import (
 )
 from .session import Session
 from .lsprotocol.client import Client as LSClient
-from .transport import Transport, ConnectionError
+from .transport import Transport
 from ..constant import LOGGING_CHANNEL
 
 LOGGER = logging.getLogger(LOGGING_CHANNEL)

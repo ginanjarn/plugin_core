@@ -1,0 +1,100 @@
+"""stdio implementation"""
+
+from io import BytesIO
+from threading import Event
+
+from .child_process import ChildProcess
+from .transport import Transport
+
+HEADER_SEPARATOR = b"\r\n"
+
+
+def set_header(content: bytes) -> bytes:
+    """set rpc header"""
+    header = b"Content-Length: %d\r\n" % len(content)
+    return b"%s%s%s" % (header, HEADER_SEPARATOR, content)
+
+
+def get_content_length(header: bytes) -> int:
+    """get content length from header
+
+    Return:
+        content_length: int
+    Raises:
+        ValueError if content length not found
+    """
+    field_text = b"Content-Length: "
+    field_end = 16  # => len(field_text)
+
+    for line in header.splitlines(keepends=False):
+        if line[:field_end] == field_text:
+            return int(line[field_end:])
+
+    raise ValueError("unable get 'Content-Length'")
+
+
+class StandardIO(Transport):
+    """StandardIO Transport implementation"""
+
+    def __init__(self, server: ChildProcess) -> None:
+        self.server = server
+        self._is_connected = False
+        self._connect_event = Event()
+
+    def connect(self) -> None:
+        if not self.server.is_running():
+            raise ConnectionError("server is not running")
+
+        self._is_connected = True
+        self._connect_event.set()
+
+    def disconnect(self) -> None:
+        self.server.terminate()
+        self._connect_event.clear()
+        self._is_connected = False
+
+    def is_connected(self) -> bool:
+        return self._is_connected
+
+    def write(self, data: bytes):
+        if not self._is_connected:
+            self._connect_event.wait()
+
+        prepared_data = set_header(data)
+        try:
+            self.server.stdin.write(prepared_data)
+            self.server.stdin.flush()
+        except Exception as err:
+            self._is_connected = False
+            raise ConnectionError("disconnected from server") from err
+
+    def read(self):
+        if not self._is_connected:
+            self._connect_event.wait()
+
+        # get header
+        header_buffer = BytesIO()
+        # loop until meet header separator
+        while line := self.server.stdout.readline():
+            if line == HEADER_SEPARATOR:
+                break
+            header_buffer.write(line)
+
+        if header := header_buffer.getvalue():
+            content_length = get_content_length(header)
+        else:
+            self._is_connected = False
+            raise ConnectionError("disconnected from server")
+
+        content_buffer = BytesIO()
+        # Read until defined content_length received.
+        missing = content_length
+        while missing:
+            if chunk := self.server.stdout.read(missing):
+                n = content_buffer.write(chunk)
+                missing -= n
+            else:
+                self._is_connected = False
+                raise ConnectionError("disconnected from server")
+
+        return content_buffer.getvalue()
