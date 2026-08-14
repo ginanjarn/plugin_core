@@ -1,12 +1,9 @@
 """session object"""
 
 import logging
-import threading
-from collections.abc import MutableMapping
 from dataclasses import dataclass
-from functools import wraps
 from enum import Enum
-from typing import Optional, List, Any, Callable, Iterator
+from typing import Optional, List, Any, Callable
 
 from sublime import View
 
@@ -15,6 +12,7 @@ from .document import Document
 from .features.text_document.diagnostic_reporter import (
     ReportManager as DiagnosticReportManager,
 )
+from .safe_dict import SafeDict
 
 PathStr = str
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
@@ -27,46 +25,8 @@ class SessionStatus(Enum):
     Shutdown = 3
 
 
-class DocumentMap(MutableMapping):
-    """Document Map
-
-    In Sublime Text one buffer may associated to multiple view.
-    For example in 2 column layout, one file opened in 2 column.
-    Map 'working_documents' with View, it's easier to manage action target
-    such hover to decide where popup must be shown.
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        self.data = dict(*args, **kwargs)
-        self._lock = threading.Lock()
-
-    def lock(func):
-        @wraps(func)
-        def wrapper(self, *args, **kwargs):
-            with self._lock:
-                return func(self, *args, **kwargs)
-
-        return wrapper
-
-    @lock
-    def __setitem__(self, key: View, value: Document) -> None:
-        self.data[key] = value
-
-    @lock
-    def __getitem__(self, key: View) -> Document:
-        return self.data[key]
-
-    @lock
-    def __delitem__(self, key: View) -> None:
-        del self.data[key]
-
-    @lock
-    def __iter__(self) -> Iterator[View]:
-        yield from iter(self.data)
-
-    @lock
-    def __len__(self) -> int:
-        return len(self.data)
+class DocumentMap(SafeDict):
+    """Document Map"""
 
 
 @dataclass
@@ -85,6 +45,11 @@ class Session:
         self.status = SessionStatus.NotSet
 
         self.workspace_folders: List[Workspace] = []
+
+        # In Sublime Text one buffer may associated to multiple view.
+        # For example in 2 column layout, one file opened in 2 column.
+        # Map 'working_documents' with View, it's easier to manage action target
+        # such hover to decide where popup must be shown.
         self.opened_documents = DocumentMap()
 
         # Diagnostic manager

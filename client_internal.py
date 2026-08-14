@@ -4,18 +4,8 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import MutableMapping
 from functools import wraps
-from typing import (
-    Optional,
-    Dict,
-    Any,
-    Iterator,
-    TYPE_CHECKING,
-)
-
-if TYPE_CHECKING:
-    from typing import _KT, _VT
+from typing import Optional, Dict, Any
 
 import sublime
 
@@ -31,6 +21,7 @@ from .message import (
     loads_rpc2,
     dumps_rpc2,
 )
+from .safe_dict import SafeDict
 from .session import Session
 from .lsprotocol.client import Client as LSClient
 from .transport import Transport
@@ -39,43 +30,8 @@ from ..constant import LOGGING_CHANNEL
 LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
 
-class Context(MutableMapping):
-    """Context data object
-
-    A dict-like object with thread locking.
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        self.data = dict(*args, **kwargs)
-        self._lock = threading.Lock()
-
-    def lock(func):
-        @wraps(func)
-        def wrapper(self, *args, **kwargs):
-            with self._lock:
-                return func(self, *args, **kwargs)
-
-        return wrapper
-
-    @lock
-    def __setitem__(self, key: _KT, value: _VT) -> None:
-        self.data[key] = value
-
-    @lock
-    def __getitem__(self, key: _KT) -> _VT:
-        return self.data[key]
-
-    @lock
-    def __delitem__(self, key: _KT) -> None:
-        del self.data[key]
-
-    @lock
-    def __iter__(self) -> Iterator[_KT]:
-        yield from iter(self.data)
-
-    @lock
-    def __len__(self) -> int:
-        return len(self.data)
+class Context(SafeDict):
+    """Context data"""
 
 
 class _MessageExchangeBase:
