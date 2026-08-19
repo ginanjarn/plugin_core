@@ -1,14 +1,10 @@
 from collections import defaultdict
 from threading import Lock
-from typing import List, Union
+from typing import List, Union, Optional
 import sublime
 import sublime_plugin
 
-from ..plugin_base import (
-    PluginBase,
-    client_must_ready,
-    must_valid_document,
-)
+from ..plugin_base import PluginBase, client_must_ready, must_valid_document
 from ...client_internal import BaseClient
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
@@ -16,11 +12,12 @@ from ...lsprotocol.client import CompletionList, CompletionItem
 
 
 class _Empty:
-    """Explicit empty value"""
+    """Explicit empty value marker"""
 
 
 EMPTY = _Empty()
 
+# Map LSP completion kinds to Sublime kinds
 COMPLETION_KIND_MAP = defaultdict(
     lambda: sublime.KIND_AMBIGUOUS,
     {
@@ -54,6 +51,7 @@ COMPLETION_KIND_MAP = defaultdict(
 
 
 class DocumentCompletionMixins(BaseClient):
+    """Handles completion requests and caching."""
 
     AUTO_COMPLETE_ARGUMENTS = {
         "disable_auto_insert": True,
@@ -61,16 +59,15 @@ class DocumentCompletionMixins(BaseClient):
         "auto_complete_commit_on_tab": True,
     }
 
-    completion_target = None
-
-    _cached_completions: List[sublime.CompletionItem] = EMPTY
+    completion_target: Optional[object] = None
+    _cached_completions: Union[List[sublime.CompletionItem], _Empty] = EMPTY
     _cached_completions_lock = Lock()
 
     def is_completions_available(self) -> bool:
         with self._cached_completions_lock:
             return self._cached_completions is not EMPTY
 
-    def set_completions(self, completions: List[sublime.CompletionItem]):
+    def set_completions(self, completions: List[sublime.CompletionItem]) -> None:
         with self._cached_completions_lock:
             self._cached_completions = completions
 
@@ -78,58 +75,75 @@ class DocumentCompletionMixins(BaseClient):
         with self._cached_completions_lock:
             completions = self._cached_completions
             self._cached_completions = EMPTY
-            return completions
+            return completions if completions is not EMPTY else []
 
     @on_new_thread
-    def textdocument_completion(self, view: sublime.View, row: int, col: int):
-        capabilities = self.session.server_capabilities.get("completionProvider", None)
+    def textdocument_completion(self, view: sublime.View, row: int, col: int) -> None:
+        """Request completions from the language server."""
+        capabilities = self.session.server_capabilities.get("completionProvider")
         if not capabilities:
             return
-        if document := self.session.get_document(view):
+        document = self.session.get_document(view)
+        if document:
             self.completion_target = document
             self.completion_request(
                 {
                     "position": {"character": col, "line": row},
                     "textDocument": {"uri": path_to_uri(document.file_name)},
-                },
+                }
             )
 
     @on_main_thread
     def handle_completion_result(
         self, context: dict, result: Union[List[CompletionItem], CompletionList, None]
     ) -> None:
+        """Handle completion results from LSP."""
         if not result:
             return
 
-        if isinstance(result, list):
-            items = [self._build_completion(item) for item in result]
-        else:
-            items = [self._build_completion(item) for item in result["items"]]
+        try:
+            if isinstance(result, list):
+                items = [self._build_completion(item) for item in result]
+            else:
+                items = [
+                    self._build_completion(item) for item in result.get("items", [])
+                ]
+        except Exception as e:
+            print(f"[LSP Completion] Error building completions: {e}")
+            return
 
-        self.set_completions(items)
-        view = self.completion_target.view
-        view.run_command("auto_complete", self.AUTO_COMPLETE_ARGUMENTS)
+        if items:
+            self.set_completions(items)
+            if self.completion_target and self.completion_target.view:
+                self.completion_target.view.run_command(
+                    "auto_complete", self.AUTO_COMPLETE_ARGUMENTS
+                )
 
     @staticmethod
     def _build_completion(completion_item: CompletionItem) -> sublime.CompletionItem:
-        label = completion_item["label"]
-        try:
-            insert_text = completion_item["textEdit"]["newText"]
-        except KeyError:
-            insert_text = label
-
+        """Convert LSP completion item to Sublime completion item."""
+        label = completion_item.get("label", "")
+        insert_text = (
+            completion_item.get("textEdit", {}).get("newText")
+            or completion_item.get("insertText")
+            or label
+        )
         detail = completion_item.get("detail", "")
+        documentation = completion_item.get("documentation", "")
         kind = COMPLETION_KIND_MAP[completion_item.get("kind", 1)]
 
+        annotation = detail or (documentation if isinstance(documentation, str) else "")
         return sublime.CompletionItem.snippet_completion(
             trigger=label,
             snippet=insert_text,
-            annotation=detail,
+            annotation=annotation,
             kind=kind,
         )
 
 
 class CompletionEventListener(PluginBase, sublime_plugin.ViewEventListener):
+    """Event listener to trigger and manage completions."""
+
     client: DocumentCompletionMixins
 
     def __init__(self, *args, **kwargs):
@@ -140,9 +154,7 @@ class CompletionEventListener(PluginBase, sublime_plugin.ViewEventListener):
     @must_valid_document
     def on_query_completions(
         self, prefix: str, locations: List[int]
-    ) -> sublime.CompletionList:
-
-        # trigger on first location
+    ) -> Optional[sublime.CompletionList]:
         location = min(locations)
 
         if self.client.is_completions_available():
@@ -152,29 +164,20 @@ class CompletionEventListener(PluginBase, sublime_plugin.ViewEventListener):
             ):
                 self.hide_completions(self.view)
                 return None
-
             return sublime.CompletionList(items, flags=sublime.INHIBIT_WORD_COMPLETIONS)
 
         self.prev_trigger_location = location
-
         row, col = self.view.rowcol(location)
         self.client.textdocument_completion(self.view, row, col)
         self.hide_completions(self.view)
-
         return None
 
     def _is_context_changed(self, view: sublime.View, old: int, new: int) -> bool:
-        """check if context moved from old point"""
-
-        # point unchanged
+        """Check if completion context has changed."""
         if old == new:
             return False
-        # point changed but still in same word
         word = view.word(old)
-        if new in word and view.substr(word).isidentifier():
-            return False
+        return not (new in word and view.substr(word).isidentifier())
 
-        return True
-
-    def hide_completions(self, view: sublime.View):
+    def hide_completions(self, view: sublime.View) -> None:
         view.run_command("hide_auto_complete")
