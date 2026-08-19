@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, asdict
-from itertools import chain
 from pathlib import Path
 from typing import Dict, List, Set, Callable
 
@@ -105,7 +104,7 @@ class ReportManager:
         else:
             self._active_view = view
 
-        diagnostic_items = self._diagnostics_map[view]
+        diagnostic_items = self._diagnostics_map.get(view, [])
         self.report_publisher.publish(self.PUBLISH_KEY, view, diagnostic_items)
 
 
@@ -117,10 +116,7 @@ class PubSub:
         self._subscribers.clear()
 
     def subscribe(self, subject: str, callback: Callable[..., None]):
-        try:
-            self._subscribers[subject].add(callback)
-        except KeyError:
-            self._subscribers[subject] = {callback}
+        self._subscribers[subject].add(callback)
 
     def publish(self, subject: str, *args, **kwargs) -> None:
         for callback in self._subscribers[subject]:
@@ -155,8 +151,9 @@ class HighlightText(AbstractReporter):
         )
 
     def clear(self):
-        for view in chain.from_iterable([w.views() for w in sublime.windows()]):
-            view.erase_regions(self._region_key)
+        for window in sublime.windows():
+            for view in window.views():
+                view.erase_regions(self._region_key)
 
 
 class StatusMessage(AbstractReporter):
@@ -169,8 +166,9 @@ class StatusMessage(AbstractReporter):
         view.set_status(self._status_key, f"Errors {err_count}, Warnings {warn_count}")
 
     def clear(self):
-        for view in chain.from_iterable([w.views() for w in sublime.windows()]):
-            view.erase_status(self._status_key)
+        for window in sublime.windows():
+            for view in window.views():
+                view.erase_status(self._status_key)
 
 
 class ReportPanel(AbstractReporter):
