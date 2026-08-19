@@ -1,5 +1,6 @@
-"""stdio implementation"""
+"""StandardIO Transport implementation for Language Server Protocol."""
 
+import logging
 from io import BytesIO
 from threading import Event
 
@@ -7,34 +8,38 @@ from .child_process import ChildProcess
 from .transport import Transport
 
 HEADER_SEPARATOR = b"\r\n"
+LOGGER = logging.getLogger(__name__)
 
 
 def set_header(content: bytes) -> bytes:
-    """set rpc header"""
-    header = b"Content-Length: %d\r\n" % len(content)
-    return b"%s%s%s" % (header, HEADER_SEPARATOR, content)
+    """Attach Content-Length header to RPC message."""
+    header = f"Content-Length: {len(content)}\r\n".encode("ascii")
+    return header + HEADER_SEPARATOR + content
 
 
 def get_content_length(header: bytes) -> int:
-    """get content length from header
+    """Extract content length from header.
 
-    Return:
-        content_length: int
     Raises:
-        ValueError if content length not found
+        ValueError: if Content-Length is missing or invalid.
     """
     field_text = b"Content-Length: "
-    field_end = 16  # => len(field_text)
+    field_end = len(field_text)
 
     for line in header.splitlines(keepends=False):
-        if line[:field_end] == field_text:
-            return int(line[field_end:])
+        if line.startswith(field_text):
+            try:
+                return int(line[field_end:])
+            except ValueError as err:
+                raise ValueError(
+                    f"Invalid Content-Length value in header: {line!r}"
+                ) from err
 
-    raise ValueError("unable get 'Content-Length'")
+    raise ValueError(f"Content-Length not found in header: {header!r}")
 
 
 class StandardIO(Transport):
-    """StandardIO Transport implementation"""
+    """Transport implementation using child process stdin/stdout pipes."""
 
     def __init__(self, server: ChildProcess) -> None:
         self.server = server
@@ -42,23 +47,30 @@ class StandardIO(Transport):
         self._connect_event = Event()
 
     def connect(self) -> None:
+        """Mark transport as connected if server is running."""
         if not self.server.is_running():
-            raise ConnectionError("server is not running")
-
+            raise ConnectionError("Server is not running")
         self._is_connected = True
         self._connect_event.set()
 
     def disconnect(self) -> None:
-        self.server.terminate()
-        self._connect_event.clear()
-        self._is_connected = False
+        """Terminate server and mark transport as disconnected."""
+        try:
+            self.server.terminate()
+        except Exception as err:
+            LOGGER.warning("Error terminating server: %s", err)
+        finally:
+            self._connect_event.clear()
+            self._is_connected = False
 
     def is_connected(self) -> bool:
         return self._is_connected
 
-    def write(self, data: bytes):
+    def write(self, data: bytes) -> None:
+        """Write framed data to server stdin."""
         if not self._is_connected:
-            self._connect_event.wait()
+            if not self._connect_event.wait(timeout=5):
+                raise ConnectionError("Timeout waiting for connection")
 
         prepared_data = set_header(data)
         try:
@@ -66,35 +78,41 @@ class StandardIO(Transport):
             self.server.stdin.flush()
         except Exception as err:
             self._is_connected = False
-            raise ConnectionError("disconnected from server") from err
+            raise ConnectionError("Disconnected from server") from err
 
-    def read(self):
+    def read(self) -> bytes:
+        """Read framed data from server stdout."""
         if not self._is_connected:
-            self._connect_event.wait()
+            if not self._connect_event.wait(timeout=5):
+                raise ConnectionError("Timeout waiting for connection")
 
-        # get header
+        # Read header
         header_buffer = BytesIO()
-        # loop until meet header separator
-        while line := self.server.stdout.readline():
+        while True:
+            line = self.server.stdout.readline()
+            if not line:
+                self._is_connected = False
+                raise ConnectionError("Server closed connection")
             if line == HEADER_SEPARATOR:
                 break
             header_buffer.write(line)
 
-        if header := header_buffer.getvalue():
-            content_length = get_content_length(header)
-        else:
+        header = header_buffer.getvalue()
+        if not header:
             self._is_connected = False
-            raise ConnectionError("disconnected from server")
+            raise ConnectionError("Empty header, disconnected")
 
+        content_length = get_content_length(header)
+
+        # Read body
         content_buffer = BytesIO()
-        # Read until defined content_length received.
         missing = content_length
-        while missing:
-            if chunk := self.server.stdout.read(missing):
-                n = content_buffer.write(chunk)
-                missing -= n
-            else:
+        while missing > 0:
+            chunk = self.server.stdout.read(missing)
+            if not chunk:
                 self._is_connected = False
-                raise ConnectionError("disconnected from server")
+                raise ConnectionError("Server closed connection mid-read")
+            content_buffer.write(chunk)
+            missing -= len(chunk)
 
         return content_buffer.getvalue()
