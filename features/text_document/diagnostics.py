@@ -1,5 +1,4 @@
 from collections import namedtuple
-
 import sublime
 from sublime import View
 
@@ -13,13 +12,14 @@ LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
 
 class DocumentDiagnosticsMixins(BaseClient):
+    """Handles diagnostics notifications from the language server."""
 
     @on_main_thread
     def handle_publish_diagnostics_notification(
         self, context: dict, params: PublishDiagnosticsParams
     ) -> None:
         file_name = uri_to_path(params["uri"])
-        diagnostics = params["diagnostics"]
+        diagnostics = params.get("diagnostics", [])
 
         documents = self.session.get_documents(lambda doc: doc.file_name == file_name)
         for document in documents:
@@ -28,15 +28,27 @@ class DocumentDiagnosticsMixins(BaseClient):
             self.session.diagnostic_reporter.report(document.view, items)
 
     def from_rpc(self, view: View, diagnostic: dict, /) -> Diagnostic:
-        """"""
-        start = LineCharacter(**diagnostic["range"]["start"])
-        end = LineCharacter(**diagnostic["range"]["end"])
-        region = sublime.Region(view.text_point(*start), view.text_point(*end))
-        message = diagnostic["message"]
+        """Convert LSP diagnostic dict into a Diagnostic object."""
+        try:
+            start = LineCharacter(**diagnostic["range"]["start"])
+            end = LineCharacter(**diagnostic["range"]["end"])
+            region = sublime.Region(view.text_point(*start), view.text_point(*end))
+        except Exception as e:
+            print(f"[LSP Diagnostics] Invalid range: {e}")
+            region = sublime.Region(0, 1)
+
+        # Build message with optional source, code, and tags
+        message = diagnostic.get("message", "")
         if source := diagnostic.get("source"):
-            message = f"{message} ({source})"
-        # resolve highlight region if start == end
+            message += f" ({source})"
+        if code := diagnostic.get("code"):
+            message += f" [code: {code}]"
+        if tags := diagnostic.get("tags"):
+            message += f" [tags: {', '.join(map(str, tags))}]"
+
+        # Ensure region is visible even if empty
         if region.empty():
             region.b += 1
 
-        return Diagnostic(diagnostic["severity"], region, message)
+        severity = diagnostic.get("severity", 2)  # default to 'warning' if missing
+        return Diagnostic(severity, region, message)
