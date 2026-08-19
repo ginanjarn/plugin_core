@@ -1,4 +1,5 @@
 import logging
+from typing import Dict, Any
 
 from ..workspace_updater import apply_workspace_edit
 from ...client_internal import BaseClient
@@ -10,14 +11,60 @@ LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
 
 class WorkspaceApplyEditMixins(BaseClient):
+    """
+    Handle workspace/applyEdit requests from the server.
+
+    Returns an ApplyWorkspaceEditResult-like dict:
+      - applied: bool
+      - failureReason: optional str (when applied is False)
+      - failedChange: optional object (when available)
+    """
+
     @on_main_thread
     def handle_apply_workspace_edit_request(
-        self, context: dict, params: ApplyWorkspaceEditParams
+        self, context: Dict[str, Any], params: ApplyWorkspaceEditParams
     ) -> ApplyWorkspaceEditResult:
+        # Validate incoming params
+        if not isinstance(params, dict):
+            LOGGER.error("applyWorkspaceEdit: invalid params type: %s", type(params))
+            return {"applied": False, "failureReason": "Invalid params"}
+
+        edit = params.get("edit")
+        if not edit:
+            LOGGER.warning("applyWorkspaceEdit: missing 'edit' in params")
+            return {"applied": False, "failureReason": "Missing edit payload"}
+
         try:
-            apply_workspace_edit(self.session, params["edit"])
+            # apply_workspace_edit is expected to raise on failure
+            apply_workspace_edit(self.session, edit)
         except Exception as err:
-            LOGGER.error(err, exc_info=True)
-            return {"applied": False}
+            # Log full traceback for diagnostics
+            LOGGER.error("applyWorkspaceEdit failed: %s", err, exc_info=True)
+
+            # Try to provide a concise failure reason for the server
+            reason = str(err) or "Unknown error applying workspace edit"
+            # Optionally include the edit or part of it as failedChange if small
+            failed_change = None
+            try:
+                # Avoid returning huge payloads back to the server
+                if isinstance(edit, dict):
+                    # include a small summary rather than the full edit
+                    failed_change = {
+                        "summary": {
+                            "documentChanges": bool(edit.get("documentChanges")),
+                            "changes_keys": list(edit.get("changes", {}).keys())[:5],
+                        }
+                    }
+            except Exception:
+                failed_change = None
+
+            result: ApplyWorkspaceEditResult = {
+                "applied": False,
+                "failureReason": reason,
+            }
+            if failed_change:
+                result["failedChange"] = failed_change
+            return result
         else:
+            LOGGER.debug("applyWorkspaceEdit applied successfully")
             return {"applied": True}
