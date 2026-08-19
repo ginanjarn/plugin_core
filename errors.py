@@ -1,11 +1,10 @@
-"""json-rpc errors"""
+"""JSON-RPC error definitions and utilities."""
 
-from functools import partial
 from typing import Union, Dict, Any, Optional
 
 
 class JSONRPCException(Exception):
-    """json-rpc exception base"""
+    """Base class for JSON-RPC exceptions."""
 
     def __init__(self, message: str, code: int, data: Optional[Any] = None) -> None:
         super().__init__(message)
@@ -14,66 +13,64 @@ class JSONRPCException(Exception):
         self.data = data
 
 
-ParseError = partial(JSONRPCException, code=-32700)
-"""An error occurred while parsing the JSON text"""
+class ParseError(JSONRPCException):
+    """An error occurred while parsing the JSON text."""
 
-InvalidRequest = partial(JSONRPCException, code=-32600)
-"""The JSON sent is not a valid Request object"""
+    def __init__(self, message: str = "Parse error", data: Optional[Any] = None):
+        super().__init__(message, -32700, data)
 
-MethodNotFound = partial(JSONRPCException, code=-32601)
-"""The method does not exist / is not available"""
 
-InvalidParams = partial(JSONRPCException, code=-32602)
-"""Invalid method parameter(s)"""
+class InvalidRequest(JSONRPCException):
+    """The JSON sent is not a valid Request object."""
 
-InternalError = partial(JSONRPCException, code=-32603)
-"""Internal JSON-RPC error"""
+    def __init__(self, message: str = "Invalid request", data: Optional[Any] = None):
+        super().__init__(message, -32600, data)
 
-ServerNotInitialized = partial(JSONRPCException, code=-32002)
-"""Server received a notification or request before the server received the `initialize` request"""
 
-UnknownErrorCode = partial(JSONRPCException, code=-32001)
+class MethodNotFound(JSONRPCException):
+    """The method does not exist / is not available."""
 
-RequestFailed = partial(JSONRPCException, code=-32803)
-"""A request failed but it was syntactically correct"""
+    def __init__(self, message: str = "Method not found", data: Optional[Any] = None):
+        super().__init__(message, -32601, data)
 
-ServerCancelled = partial(JSONRPCException, code=-32802)
-"""The server cancelled the request"""
 
-ContentModified = partial(JSONRPCException, code=-32801)
-"""The content of a document got modified outside normal conditions"""
+class InvalidParams(JSONRPCException):
+    """Invalid method parameter(s)."""
 
-RequestCancelled = partial(JSONRPCException, code=-32800)
-"""The client has canceled a request and a server has detected the cancel"""
+    def __init__(self, message: str = "Invalid params", data: Optional[Any] = None):
+        super().__init__(message, -32602, data)
+
+
+class InternalError(JSONRPCException):
+    """Internal JSON-RPC error."""
+
+    def __init__(self, message: str = "Internal error", data: Optional[Any] = None):
+        super().__init__(message, -32603, data)
 
 
 class ServerError(JSONRPCException):
-    """Reserved for implementation-defined server-errors"""
+    """Reserved for implementation-defined server-errors."""
 
     min_range = -32099
     max_range = -32000
 
     def __init__(self, message: str, code: int, data: Optional[Any] = None) -> None:
-        if not (self.min_range < code < self.max_range):
-            raise ValueError(f"valid code {self.min_range} to {self.max_range}")
+        if not (self.min_range <= code <= self.max_range):
+            raise ValueError(
+                f"Valid code range is {self.min_range} to {self.max_range}"
+            )
         super().__init__(message, code, data)
 
 
 def transform_error(
     error: Union[JSONRPCException, Exception, None],
 ) -> Optional[Dict[str, Any]]:
-    """transform exception to rpc error"""
-
-    if not error:
+    """Transform an exception into a JSON-RPC error dict."""
+    if error is None:
         return None
 
-    try:
-        code = error.code
-        message = error.message
+    if isinstance(error, JSONRPCException):
+        return {"code": error.code, "message": error.message, "data": error.data}
 
-    except AttributeError:
-        # 'err.code' and 'err.message' may be not defined
-        code = InternalError.code
-        message = repr(error)
-
-    return {"code": code, "message": message}
+    # Fallback for generic exceptions
+    return {"code": -32603, "message": repr(error)}
