@@ -13,187 +13,282 @@ from ...document import Document, TextChange
 from ...uri import path_to_uri
 from ...lsprotocol.lsprotocol import TextDocumentContentChangePartial
 
+# Threshold in bytes to avoid sending full document text blindly
+FULL_TEXT_SIZE_THRESHOLD = 200_000
+
 
 class DocumentSynchronizerMixins(BaseClient):
+    """
+    Robust document synchronization mixin.
+    Handles didOpen, didSave, didClose and didChange notifications with
+    defensive checks and version management.
+    """
 
-    def textdocument_didopen(self, view: sublime.View, *, reload: bool = False):
-        capabilities = self.session.server_capabilities.get("textDocumentSync", {})
-        if not capabilities.get("openClose", False):
-            return
-
-        # check if view not closed
-        if not (view and view.is_valid()):
-            return
-        # show diagnostic report
-        self.session.diagnostic_reporter.show(view)
-
-        # Check if document has opened
-        if self.session.get_document(view):
-            if not reload:
+    def textdocument_didopen(self, view: sublime.View, *, reload: bool = False) -> None:
+        try:
+            capabilities = (
+                self.session.server_capabilities.get("textDocumentSync", {}) or {}
+            )
+            if not capabilities.get("openClose", False):
                 return
 
-            # Close older document.
-            self.textdocument_didclose(view)
+            if not (view and view.is_valid()):
+                return
 
-        document = Document(view)
+            # Ensure diagnostic UI is visible for this view
+            self.session.diagnostic_reporter.show(view)
 
-        # Check if the document has opened in other view
-        other = self.session.get_document_with_name(view.file_name())
-        if not other:
-            # Notify server to open document
-            self.did_open_text_document_notification(
-                {
-                    "textDocument": {
-                        "languageId": document.language_id,
-                        "text": document.text,
-                        "uri": path_to_uri(document.file_name),
-                        "version": document.version,
+            # If document already tracked and reload not requested, do nothing
+            existing = self.session.get_document(view)
+            if existing and not reload:
+                return
+
+            # If reloading, close the older tracked document first
+            if existing and reload:
+                self.textdocument_didclose(view)
+
+            document = Document(view)
+
+            # If file is already opened in another view, do not send didOpen again
+            other = self.session.get_document_with_name(view.file_name())
+            if not other and view.file_name():
+                # Avoid sending full text for very large files
+                text_to_send = document.text
+                if len(text_to_send.encode("utf-8")) > FULL_TEXT_SIZE_THRESHOLD:
+                    sublime.status_message(
+                        "LSP: File too large to send full text on open"
+                    )
+                    # fall back to not sending text or send a trimmed version
+                    text_to_send = text_to_send[:FULL_TEXT_SIZE_THRESHOLD]
+
+                self.did_open_text_document_notification(
+                    {
+                        "textDocument": {
+                            "languageId": document.language_id,
+                            "text": text_to_send,
+                            "uri": path_to_uri(document.file_name),
+                            "version": document.version,
+                        }
                     }
-                },
+                )
+
+            # Always add document to session so untitled buffers are tracked locally
+            self.session.add_document(document)
+        except Exception:
+            print("[LSP Sync] Error in didOpen")
+
+    def textdocument_didsave(self, view: sublime.View) -> None:
+        try:
+            capabilities = (
+                self.session.server_capabilities.get("textDocumentSync", {}) or {}
             )
+            if not capabilities.get("save", False):
+                return
 
-        # Add current document
-        self.session.add_document(document)
+            document = self.session.get_document(view)
+            if document and view.file_name():
+                self.did_save_text_document_notification(
+                    {"textDocument": {"uri": path_to_uri(document.file_name)}}
+                )
+            else:
+                # If the server expects save but document not tracked, open it first
+                self.textdocument_didopen(view)
+        except Exception:
+            print("[LSP Sync] Error in didSave")
 
-    def textdocument_didsave(self, view: sublime.View):
-        capabilities = self.session.server_capabilities.get("textDocumentSync", {})
-        if not capabilities.get("save", False):
-            return
-
-        if document := self.session.get_document(view):
-            self.did_save_text_document_notification(
-                {"textDocument": {"uri": path_to_uri(document.file_name)}},
+    def textdocument_didclose(self, view: sublime.View) -> None:
+        try:
+            capabilities = (
+                self.session.server_capabilities.get("textDocumentSync", {}) or {}
             )
+            if not capabilities.get("openClose", False):
+                return
 
-        else:
-            # untitled document not yet loaded to server
-            self.textdocument_didopen(view)
+            # Remove diagnostics for this view
+            self.session.diagnostic_reporter.delete(view)
 
-    def textdocument_didclose(self, view: sublime.View):
-        capabilities = self.session.server_capabilities.get("textDocumentSync", {})
-        if not capabilities.get("openClose", False):
-            return
+            # If the same file is open in multiple views, only remove local view tracking
+            documents = self.session.get_documents(
+                filter_func=lambda doc: doc.file_name == view.file_name()
+            )
+            if len(documents) > 1:
+                self.session.remove_document(view)
+                return
 
-        # delete diagnostic report
-        self.session.diagnostic_reporter.delete(view)
+            document = self.session.get_document(view)
+            if document and document.file_name:
+                self.did_close_text_document_notification(
+                    {"textDocument": {"uri": path_to_uri(document.file_name)}}
+                )
 
-        # Check if the document open in multiple view like side-by-side layout
-        documents = self.session.get_documents(
-            filter_func=lambda doc: doc.file_name == view.file_name()
-        )
-        if len(documents) > 1:
-            # Remove the document but don't notify to server
             self.session.remove_document(view)
-            return
+        except Exception:
+            print("[LSP Sync] Error in didClose")
 
-        if document := self.session.get_document(view):
-            self.did_close_text_document_notification(
-                {"textDocument": {"uri": path_to_uri(document.file_name)}},
+    def textdocument_didchange(
+        self, view: sublime.View, changes: List[TextChange]
+    ) -> None:
+        try:
+            capabilities = (
+                self.session.server_capabilities.get("textDocumentSync", {}) or {}
             )
+            change_mode = capabilities.get("change", 0)
+            if not change_mode:
+                return
 
-        self.session.remove_document(view)
+            document = self.session.get_document(view)
+            if not document:
+                # If not tracked, open it first then send change
+                self.textdocument_didopen(view)
+                document = self.session.get_document(view)
+                if not document:
+                    return
 
-    def textdocument_didchange(self, view: sublime.View, changes: List[TextChange]):
-        capabilities = self.session.server_capabilities.get("textDocumentSync", {})
-        change_mode = capabilities.get("change", 0)
-        if not change_mode:
-            return
-
-        if document := self.session.get_document(view):
+            # Build contentChanges according to server's supported mode
             if change_mode == 1:
-                contentChanges = {"text": view.substr(sublime.Region(0, view.size()))}
+                # Full text sync
+                full_text = view.substr(sublime.Region(0, view.size()))
+                # Guard against huge payloads
+                if len(full_text.encode("utf-8")) > FULL_TEXT_SIZE_THRESHOLD:
+                    sublime.status_message("LSP: Skipping full text sync due to size")
+                    return
+                content_changes = {"text": full_text}
             elif change_mode == 2:
-                contentChanges = [self._textchange_to_rpc(c) for c in changes]
+                # Incremental sync expects a list of TextDocumentContentChangePartial
+                content_changes = [self._textchange_to_rpc(c) for c in changes if c]
+                # If conversion produced no valid changes, skip
+                if not content_changes:
+                    return
+            else:
+                # Unknown mode, do nothing
+                return
 
             self.did_change_text_document_notification(
                 {
-                    "contentChanges": contentChanges,
                     "textDocument": {
                         "uri": path_to_uri(document.file_name),
                         "version": document.version,
                     },
-                },
+                    "contentChanges": content_changes,
+                }
             )
+        except Exception:
+            print("[LSP Sync] Error in didChange")
 
     @staticmethod
     def _textchange_to_rpc(change: TextChange) -> TextDocumentContentChangePartial:
-        """"""
-        start, end = change.start, change.end
-        return {
-            "range": {
-                "start": {"line": start[0], "character": start[1]},
-                "end": {"line": end[0], "character": end[1]},
-            },
-            "rangeLength": change.length,
-            "text": change.text,
-        }
+        """
+        Convert internal TextChange to LSP TextDocumentContentChangePartial.
+        Validate ranges and provide safe defaults on malformed input.
+        """
+        try:
+            start, end = change.start, change.end
+            # Ensure numeric indices
+            start_line = int(start[0])
+            start_char = int(start[1])
+            end_line = int(end[0])
+            end_char = int(end[1])
+            return {
+                "range": {
+                    "start": {"line": start_line, "character": start_char},
+                    "end": {"line": end_line, "character": end_char},
+                },
+                "rangeLength": int(getattr(change, "length", 0)),
+                "text": getattr(change, "text", ""),
+            }
+        except Exception:
+            # Fallback to sending the whole text if conversion fails
+            return {"text": ""}
 
 
 class SynchronizeEventAdapter(PluginBase):
     client: DocumentSynchronizerMixins
 
-    def didopen(self, view: sublime.View, *, reload: bool = False):
+    def didopen(self, view: sublime.View, *, reload: bool = False) -> None:
         self.client.textdocument_didopen(view, reload=reload)
 
-    def didsave(self, view: sublime.View):
+    def didsave(self, view: sublime.View) -> None:
         self.client.textdocument_didsave(view)
 
-    def didclose(self, view: sublime.View):
+    def didclose(self, view: sublime.View) -> None:
         self.client.textdocument_didclose(view)
 
-    def didchange(self, view: sublime.View, changes: List[TextChange]):
+    def didchange(self, view: sublime.View, changes: List[TextChange]) -> None:
         self.client.textdocument_didchange(view, changes)
 
 
 class DocumentSynchronizeEventListener(
     SynchronizeEventAdapter, sublime_plugin.ViewEventListener
 ):
+    @client_must_ready
+    @must_valid_document
+    def on_activated_async(self) -> None:
+        try:
+            self.didopen(self.view)
+        except Exception:
+            print("[LSP Sync] on_activated_async error")
 
     @client_must_ready
     @must_valid_document
-    def on_activated_async(self):
-        self.didopen(self.view)
+    def on_load_async(self) -> None:
+        try:
+            self.didopen(self.view, reload=True)
+        except Exception:
+            print("[LSP Sync] on_load_async error")
 
     @client_must_ready
     @must_valid_document
-    def on_load_async(self):
-        self.didopen(self.view, reload=True)
+    def on_reload_async(self) -> None:
+        try:
+            self.didopen(self.view, reload=True)
+        except Exception:
+            print("[LSP Sync] on_reload_async error")
 
     @client_must_ready
     @must_valid_document
-    def on_reload_async(self):
-        self.didopen(self.view, reload=True)
+    def on_revert_async(self) -> None:
+        try:
+            self.didopen(self.view, reload=True)
+        except Exception:
+            print("[LSP Sync] on_revert_async error")
 
     @client_must_ready
     @must_valid_document
-    def on_revert_async(self):
-        self.didopen(self.view, reload=True)
+    def on_post_save_async(self) -> None:
+        try:
+            self.didsave(self.view)
+        except Exception:
+            print("[LSP Sync] on_post_save_async error")
 
     @client_must_ready
     @must_valid_document
-    def on_post_save_async(self):
-        self.didsave(self.view)
-
-    @client_must_ready
-    @must_valid_document
-    def on_close(self):
-        self.didclose(self.view)
+    def on_close(self) -> None:
+        try:
+            self.didclose(self.view)
+        except Exception:
+            print("[LSP Sync] on_close error")
 
 
 class DocumentSynchronizeTextChangeListener(
     SynchronizeEventAdapter, sublime_plugin.TextChangeListener
 ):
-
     @client_must_ready
-    def on_text_changed(self, changes: List[sublime.TextChange]):
-        view = self.buffer.primary_view()
-        if not is_valid_document(view):
-            return
-        self.didchange(view, [self._to_textchange(c) for c in changes])
-
-    @staticmethod
-    def _to_textchange(change: sublime.TextChange) -> TextChange:
-        """"""
-        start = (change.a.row, change.a.col)
-        end = (change.b.row, change.b.col)
-        return TextChange(start, end, change.str, change.len_utf8)
+    def on_text_changed(self, changes: List[sublime.TextChange]) -> None:
+        try:
+            view = self.buffer.primary_view()
+            if not is_valid_document(view):
+                return
+            # Convert Sublime TextChange to our TextChange dataclass safely
+            converted = []
+            for c in changes:
+                try:
+                    start = (c.a.row, c.a.col)
+                    end = (c.b.row, c.b.col)
+                    converted.append(TextChange(start, end, c.str, c.len_utf8))
+                except Exception:
+                    # skip malformed change entries
+                    continue
+            if converted:
+                self.didchange(view, converted)
+        except Exception:
+            print("[LSP Sync] on_text_changed error")
