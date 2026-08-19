@@ -1,4 +1,4 @@
-"""client object"""
+"""RPC client implementation for Language Server"""
 
 from __future__ import annotations
 
@@ -31,23 +31,31 @@ LOGGER = logging.getLogger(LOGGING_CHANNEL)
 
 
 class Context(SafeDict):
-    """Context data"""
+    """Context data passed to handlers (e.g., session state, metadata)."""
 
 
 class _MessageExchangeBase:
+    """Base class for message exchange over a transport."""
 
     def __init__(self, transport: Transport):
-        self.transport = transport
+        self.transport: Transport = transport
 
     def send(self, message: dict) -> None:
-        """send message"""
-        content = dumps_rpc2(message, as_bytes=True)
-        self.transport.write(content)
+        """Send a message over the transport."""
+        try:
+            content = dumps_rpc2(message, as_bytes=True)
+            self.transport.write(content)
+        except Exception as err:
+            LOGGER.error("Failed to send message: %s", err)
 
     def recv(self) -> dict:
-        """receive message"""
-        content = self.transport.read()
-        return loads_rpc2(content)
+        """Receive a message from the transport."""
+        try:
+            content = self.transport.read()
+            return loads_rpc2(content)
+        except Exception as err:
+            LOGGER.error("Failed to receive/parse message: %s", err)
+            raise
 
     def _handle(
         self, context: Context, method: Method, param_or_result: Optional[Any] = None
@@ -67,9 +75,9 @@ class RequestManager:
         self.pending: Dict[int, Method] = {}
         self.request_count = 0
 
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
-    def lock(func):
+    def _with_lock(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
             with self._lock:
@@ -77,12 +85,12 @@ class RequestManager:
 
         return wrapper
 
-    @lock
+    @_with_lock
     def reset(self) -> None:
         self.pending.clear()
         self.request_count = 0
 
-    @lock
+    @_with_lock
     def add(self, method: Method) -> int:
         """add pending request
 
@@ -94,7 +102,7 @@ class RequestManager:
 
         return self.request_count
 
-    @lock
+    @_with_lock
     def pop(self, request_id: int) -> Optional[Method]:
         """pop pending request
 
@@ -103,16 +111,16 @@ class RequestManager:
         """
         return self.pending.pop(request_id, None)
 
-    @lock
+    @_with_lock
     def pop_pending(self, method: Method) -> Optional[int]:
         """pop pending request"""
-        matches = (id for id, meth in self.pending.items() if meth == method)
-        if id := next(matches, None):
-            del self.pending[id]
-            return id
+        matches = (req_id for req_id, meth in self.pending.items() if meth == method)
+        if req_id := next(matches, None):
+            del self.pending[req_id]
+            return req_id
         return None
 
-    @lock
+    @_with_lock
     def cancel_all(self):
         """cancel all pending request"""
         self.pending.clear()
@@ -134,16 +142,16 @@ class ClientCommand(_MessageExchangeBase):
         self.send(new_request(req_id, method, params))
 
     def _handle_response(self, context: Context, message: dict) -> None:
-        method = self.request_manager.pop(message["id"])
+        method = self.request_manager.pop(message.get("id"))
         if method is None:
             return
 
         if error := message.get("error"):
-            print(error["message"])
+            LOGGER.error("Response error(%d): %s", message["id"], error["message"])
             return
 
         try:
-            self._handle(context, method, message["result"])
+            self._handle(context, method, message.get("result"))
         except Exception as err:
             LOGGER.exception(err, exc_info=True)
 
@@ -161,15 +169,13 @@ class ServerCommand(_MessageExchangeBase):
     """Server command interface"""
 
     def _handle_request(self, context: Context, message: dict) -> None:
-        result = None
-        error = None
         try:
-            result = self._handle(context, message["method"], message["params"])
+            result = self._handle(context, message["method"], message.get("params"))
+            self._respond(message["id"], result, None)
         except Exception as err:
-            LOGGER.exception(err, exc_info=True)
+            LOGGER.exception("Error handling request", exc_info=True)
             error = transform_error(err)
-
-        self._respond(message.id, result, error)
+            self._respond(message["id"], None, error)
 
     def _respond(
         self, id: int, result: Optional[Any] = None, error: Optional[dict] = None
@@ -180,7 +186,7 @@ class ServerCommand(_MessageExchangeBase):
         try:
             self._handle(context, message["method"], message["params"])
         except Exception as err:
-            LOGGER.exception(err, exc_info=True)
+            LOGGER.exception("Error handling notification %s", err, exc_info=True)
 
 
 class RPC(ClientCommand, ServerCommand, LSClient):
@@ -189,6 +195,8 @@ class RPC(ClientCommand, ServerCommand, LSClient):
     def __init__(self, transport: Transport):
         super().__init__(transport)
         self.session = Session()
+        self._stop_event = threading.Event()
+        self._listen_thread: Optional[threading.Thread] = None
 
     def is_ready(self) -> bool:
         """check client is ready"""
@@ -207,22 +215,24 @@ class RPC(ClientCommand, ServerCommand, LSClient):
         self.listen()
 
     def disconnect(self) -> None:
+        self._stop_event.set()
         self.transport.disconnect()
 
     def listen(self) -> None:
         self.request_manager.reset()
 
-        thread = threading.Thread(target=self._listen_task, daemon=True)
-        thread.start()
+        self._stop_event.clear()
+        self._listen_thread = threading.Thread(target=self._listen_task, daemon=True)
+        self._listen_thread.start()
 
     def _listen_task(self) -> None:
-        while True:
+        while not self._stop_event.is_set():
             try:
                 message = self.recv()
             except ConnectionError:
                 break
             except Exception as err:
-                LOGGER.error("error parsing message: %s", err)
+                LOGGER.error("Error parsing message: %s", err)
                 break
 
             try:
@@ -241,10 +251,10 @@ class RPC(ClientCommand, ServerCommand, LSClient):
                     self._handle_response(context, message)
 
             except Exception:
-                LOGGER.error("error handle message: %r", message, exc_info=True)
+                LOGGER.error("Error handle message: %r", message, exc_info=True)
                 break
 
-        # disconnent
+        # disconnect
         self.disconnect()
 
     def _handle(
@@ -264,3 +274,13 @@ class BaseClient(RPC):
     ):
         super().__init__(transport)
         self.server_process = process
+
+    def shutdown(self) -> None:
+        """Shutdown the server process."""
+        try:
+            self.request("shutdown", {})
+            self.notify("exit", {})
+        except Exception as err:
+            LOGGER.warning("Error sending shutdown/exit: %s", err)
+        finally:
+            self.server_process.terminate()
