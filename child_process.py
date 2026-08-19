@@ -1,5 +1,6 @@
-"""child process handler"""
+"""Child process handler for managing language server subprocesses."""
 
+import logging
 import os
 import shlex
 import subprocess
@@ -8,6 +9,8 @@ from functools import wraps
 from io import BytesIO
 from pathlib import Path
 from typing import List, Tuple, Optional, Union, Callable, Any
+
+LOGGER = logging.getLogger(__name__)
 
 if os.name == "nt":
     STARTUPINFO = subprocess.STARTUPINFO()
@@ -21,17 +24,7 @@ def recover_exception(
     default_factory: Callable[[], Any],
     exceptions: Optional[Union[Exception, Tuple[Exception, ...]]] = None,
 ):
-    """return default value if exception raised
-
-    Arguments:
-        default_factory: factory of default value
-        excepttions: captured exceptions
-
-    Returns:
-        default_factory() result
-    """
-
-    # default
+    """Return default value if exception is raised."""
     exceptions = exceptions or Exception
 
     def wrapper(func):
@@ -39,7 +32,8 @@ def recover_exception(
         def inner(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
-            except exceptions:
+            except exceptions as err:
+                LOGGER.debug("Recovering from exception: %s", err)
                 return default_factory()
 
         return inner
@@ -48,23 +42,22 @@ def recover_exception(
 
 
 class ChildProcess:
-    """Child Process"""
+    """Wrapper around subprocess.Popen with safe lifecycle management."""
 
     def __init__(self, command: List[str], cwd: Optional[Path] = None):
         if not isinstance(command, list):
-            raise ValueError("command value must list of str")
+            raise ValueError("command must be a list of str")
 
         self.command = command
         self.cwd = cwd
+        self.process: Optional[subprocess.Popen] = None
 
-        self.process: subprocess.Popen = None
-        # lock for run() and terminate() call
         self._switch_lock = threading.RLock()
         self._is_running = False
         self._stderr_closed_event = threading.Event()
 
     def is_running(self) -> bool:
-        """If process is running"""
+        """Check if process is running."""
         with self._switch_lock:
             return self._is_running
 
@@ -73,81 +66,89 @@ class ChildProcess:
         command: Optional[List[str]] = None,
         env: Optional[dict] = None,
     ) -> None:
-        """Run process"""
-
+        """Start the child process."""
         with self._switch_lock:
-            # Prevent process reassignment
             if self._is_running:
+                LOGGER.warning("Process already running, ignoring run()")
                 return
 
             _command = command or self.command
-            print("execute '%s'" % shlex.join(self.command))
+            LOGGER.info("Executing command: %s", shlex.join(_command))
 
-            self.process = subprocess.Popen(
-                _command,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=env or None,
-                cwd=self.cwd or None,
-                bufsize=0,
-                startupinfo=STARTUPINFO,
-            )
+            try:
+                self.process = subprocess.Popen(
+                    _command,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    env=env or None,
+                    cwd=self.cwd or None,
+                    bufsize=0,
+                    startupinfo=STARTUPINFO,
+                )
+            except Exception as err:
+                LOGGER.error("Failed to start process: %s", err)
+                raise
 
-            thread1 = threading.Thread(target=self._listen_stderr_task, daemon=True)
-            thread2 = threading.Thread(target=self._wait_exit_task, daemon=True)
+            threading.Thread(target=self._listen_stderr_task, daemon=True).start()
+            threading.Thread(target=self._wait_exit_task, daemon=True).start()
 
-            thread1.start()
-            thread2.start()
             self._is_running = True
 
     @property
     @recover_exception(BytesIO)
     def stdin(self):
-        return self.process.stdin
+        return self.process.stdin if self.process else None
 
     @property
     @recover_exception(BytesIO)
     def stdout(self):
-        return self.process.stdout
+        return self.process.stdout if self.process else None
 
     @property
     @recover_exception(BytesIO)
     def stderr(self):
-        return self.process.stderr
+        return self.process.stderr if self.process else None
 
     def _listen_stderr_task(self):
+        """Continuously read stderr and log output."""
         self._stderr_closed_event.clear()
-
         prefix = f"[{self.command[0]}]"
-        try:
-            while bline := self.stderr.readline():
-                print(prefix, bline.rstrip().decode())
 
+        try:
+            while True:
+                line = self.stderr.readline()
+                if not line:
+                    break
+                LOGGER.error("%s %s", prefix, line.rstrip().decode(errors="replace"))
         finally:
-            # Stderr return empty character, process is terminated
             self._stderr_closed_event.set()
 
     def _wait_exit_task(self) -> None:
-        """call terminate() on broken child"""
-        self.process.wait()
-
+        """Wait for process exit and trigger termination cleanup."""
+        if self.process:
+            self.process.wait()
         with self._switch_lock:
             self.terminate()
 
     def terminate(self) -> None:
-        """Terminate process"""
-
+        """Terminate the child process gracefully."""
         with self._switch_lock:
             if not self._is_running:
                 return
             self._is_running = False
 
-            self.process.terminate()
-            return_code = self.process.wait()
-            print("process terminated with exit code", return_code)
+            try:
+                if self.process:
+                    self.process.terminate()
+                    return_code = self.process.wait(timeout=5)
+                    LOGGER.info("Process terminated with exit code %s", return_code)
+            except subprocess.TimeoutExpired:
+                LOGGER.warning("Process did not exit, killing...")
+                self.process.kill()
+            except Exception as err:
+                LOGGER.error("Error terminating process: %s", err)
 
-            # wait until stderr closed
-            self._stderr_closed_event.wait()
-            # Set to None to release 'Popen()' object from memory
+            # Ensure stderr thread finishes
+            self._stderr_closed_event.wait(timeout=2)
             self.process = None
