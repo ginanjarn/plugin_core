@@ -25,9 +25,8 @@ from .safe_dict import SafeDict
 from .session import Session
 from .lsprotocol.client import Client as LSClient
 from .transport import Transport
-from ..constant import LOGGING_CHANNEL
 
-LOGGER = logging.getLogger(LOGGING_CHANNEL)
+LOGGER = logging.getLogger(__name__)
 
 
 class Context(SafeDict):

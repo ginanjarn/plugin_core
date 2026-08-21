@@ -7,7 +7,6 @@ from typing import Optional, List, Any, Callable
 
 from sublime import View
 
-from ..constant import LOGGING_CHANNEL
 from .document import Document
 from .features.text_document.diagnostic_reporter import (
     ReportManager as DiagnosticReportManager,
@@ -15,7 +14,7 @@ from .features.text_document.diagnostic_reporter import (
 from .safe_dict import SafeDict
 
 PathStr = str
-LOGGER = logging.getLogger(LOGGING_CHANNEL)
+LOGGER = logging.getLogger(__name__)
 
 
 class SessionStatus(Enum):

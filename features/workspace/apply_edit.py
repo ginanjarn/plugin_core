@@ -5,9 +5,8 @@ from ..workspace_updater import apply_workspace_edit
 from ...client_internal import BaseClient
 from ...lsprotocol.client import ApplyWorkspaceEditParams, ApplyWorkspaceEditResult
 from ...utils import on_main_thread
-from ....constant import LOGGING_CHANNEL
 
-LOGGER = logging.getLogger(LOGGING_CHANNEL)
+LOGGER = logging.getLogger(__name__)
 
 
 class WorkspaceApplyEditMixins(BaseClient):

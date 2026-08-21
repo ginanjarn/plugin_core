@@ -6,9 +6,8 @@ from ..plugin_base import client_must_ready
 from ...client_internal import BaseClient
 from ...lsprotocol.client import LSPAny
 from ...utils import on_main_thread, on_new_thread
-from ....constant import LOGGING_CHANNEL
 
-LOGGER = logging.getLogger(LOGGING_CHANNEL)
+LOGGER = logging.getLogger(__name__)
 
 
 class WorkspaceExecuteCommandMixins(BaseClient):
