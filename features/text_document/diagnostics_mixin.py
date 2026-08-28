@@ -11,7 +11,7 @@ from ...utils import on_main_thread
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
 
-class DocumentDiagnosticsMixins(BaseClient):
+class DocumentDiagnosticsMixin(BaseClient):
     """Handles diagnostics notifications from the language server."""
 
     @on_main_thread

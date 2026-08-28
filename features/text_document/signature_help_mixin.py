@@ -1,0 +1,190 @@
+import time
+from collections import namedtuple
+from typing import Optional, Union, List, Dict, Any
+
+import sublime
+
+from ...client_internal import BaseClient
+from ...uri import path_to_uri
+from ...utils import on_main_thread, on_new_thread
+from ...lsprotocol.client import SignatureHelp
+
+LineCharacter = namedtuple("LineCharacter", ["line", "character"])
+
+# Debounce interval in seconds to avoid spamming the server on fast typing
+SIGNATURE_HELP_DEBOUNCE = 0.08
+# Maximum characters shown in a signature popup to avoid huge UI blocks
+MAX_SIGNATURE_CHARS = 6_000
+
+
+class DocumentSignatureHelpMixin(BaseClient):
+    """Handle LSP signatureHelp requests and show a transient popup with signature info."""
+
+    signature_help_target: Optional[object] = None
+    _last_request_time: float = 0.0
+    _pending_request: bool = False
+
+    @on_new_thread
+    def textdocument_signaturehelp(
+        self, view: sublime.View, row: int, col: int
+    ) -> None:
+        """Send signatureHelp request to the server with debounce and stale-response protection."""
+        capabilities = self.session.server_capabilities.get("signatureHelpProvider", {})
+        if not capabilities:
+            return
+
+        document = self.session.get_document(view)
+        if not document:
+            return
+
+        # Debounce: ignore requests that come too quickly
+        now = time.monotonic()
+        if now - self._last_request_time < SIGNATURE_HELP_DEBOUNCE:
+            # mark that a request is pending and schedule a slightly delayed request
+            if not self._pending_request:
+                self._pending_request = True
+
+                # schedule a delayed call on a new thread to avoid blocking
+                def delayed():
+                    time.sleep(SIGNATURE_HELP_DEBOUNCE)
+                    self.textdocument_signaturehelp(view, row, col)
+
+                from threading import Thread
+
+                Thread(target=delayed, daemon=True).start()
+            return
+
+        self._pending_request = False
+        self._last_request_time = now
+
+        # hide any previous popup
+        if self.signature_help_target:
+            try:
+                self.signature_help_target.view.hide_popup()
+            except Exception:
+                pass
+
+        self.signature_help_target = document
+        self.signature_help_request(
+            {
+                "position": {"line": row, "character": col},
+                "textDocument": {"uri": path_to_uri(document.file_name)},
+            },
+        )
+
+    @on_main_thread
+    def handle_signature_help_result(
+        self, context: dict, result: Union[SignatureHelp, None]
+    ) -> None:
+        """Receive signature help result and show popup if still relevant."""
+        if not result:
+            return
+
+        if not self.signature_help_target:
+            return
+
+        try:
+            content, markup = self._build_signature_content(result)
+        except Exception as e:
+            print(f"[LSP SignatureHelp] Error building content: {e}")
+            return
+
+        if not content:
+            return
+
+        # truncate very long content
+        if len(content) > MAX_SIGNATURE_CHARS:
+            content = content[: MAX_SIGNATURE_CHARS - 200] + "\n\n... (truncated)"
+
+        view = self.signature_help_target.view
+        location = view.sel()[0].a if view.sel() else 0
+        self.show_signature_popup(view, content, location, markup)
+
+    def _build_signature_content(self, help_obj: SignatureHelp) -> (str, str):
+        """
+        Normalize SignatureHelp into markdown text and markup type.
+        Returns (content, markup) where markup is 'markdown'.
+        """
+        # SignatureHelp shape: { signatures: [...], activeSignature?: int, activeParameter?: int }
+        signatures: List[Dict[str, Any]] = (
+            help_obj.get("signatures", []) if isinstance(help_obj, dict) else []
+        )
+        if not signatures:
+            return "", "markdown"
+
+        active_sig = help_obj.get("activeSignature", 0) or 0
+        active_param = help_obj.get("activeParameter", None)
+
+        # clamp active signature index
+        if active_sig < 0 or active_sig >= len(signatures):
+            active_sig = 0
+
+        sig = signatures[active_sig]
+        label = sig.get("label", "")
+        documentation = ""
+        doc = sig.get("documentation")
+        if isinstance(doc, str):
+            documentation = doc
+        elif isinstance(doc, dict):
+            documentation = doc.get("value", "")
+
+        # If parameters are provided, try to highlight the active parameter
+        params = sig.get("parameters", [])
+        highlighted_label = label
+        try:
+            if params and active_param is not None and 0 <= active_param < len(params):
+                p = params[active_param]
+                p_label = p.get("label")
+                # parameter label can be a string or [start, end]
+                if isinstance(p_label, str) and p_label:
+                    # attempt to replace the first occurrence of parameter text with bold markdown
+                    # fallback: wrap parameter text in backticks if replacement fails
+                    if p_label in highlighted_label:
+                        highlighted_label = highlighted_label.replace(
+                            p_label, f"**{p_label}**", 1
+                        )
+                    else:
+                        # try to use parameter index to approximate highlighting
+                        highlighted_label = f"**{p_label}** — {highlighted_label}"
+                elif isinstance(p_label, list) and len(p_label) == 2:
+                    # numeric range inside label: try to slice
+                    start_idx, end_idx = p_label
+                    if 0 <= start_idx < end_idx <= len(highlighted_label):
+                        highlighted_label = (
+                            highlighted_label[:start_idx]
+                            + "**"
+                            + highlighted_label[start_idx:end_idx]
+                            + "**"
+                            + highlighted_label[end_idx:]
+                        )
+        except Exception:
+            # best-effort highlighting; ignore failures
+            pass
+
+        # Build content: code block for signature, then documentation if present
+        parts: List[str] = []
+        parts.append(f"```\n{highlighted_label}\n```")
+        if documentation:
+            parts.append(documentation)
+
+        # If there are multiple signatures, show a small footer with index
+        if len(signatures) > 1:
+            parts.append(f"_Signature {active_sig + 1} of {len(signatures)}_")
+
+        return "\n\n".join(parts), "markdown"
+
+    @staticmethod
+    def show_signature_popup(
+        view: sublime.View, text: str, location: int, markup: str
+    ) -> None:
+        """Show signature popup using the project's marked_popup command."""
+        if text is None:
+            return
+        view.run_command(
+            "marked_popup",
+            {
+                "location": location,
+                "text": text,
+                "markup": markup,
+            },
+        )

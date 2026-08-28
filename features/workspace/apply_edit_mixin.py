@@ -9,7 +9,7 @@ from ...utils import on_main_thread
 LOGGER = logging.getLogger(__name__)
 
 
-class WorkspaceApplyEditMixins(BaseClient):
+class WorkspaceApplyEditMixin(BaseClient):
     """
     Handle workspace/applyEdit requests from the server.
 

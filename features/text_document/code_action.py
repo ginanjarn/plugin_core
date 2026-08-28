@@ -1,4 +1,5 @@
-from typing import List, Optional, Union
+from typng import List
+
 import sublime
 import sublime_plugin
 
@@ -8,100 +9,11 @@ from ..plugin_base import (
     is_valid_document,
     must_valid_document,
 )
-from ..workspace_updater import apply_workspace_edit
-from ...client_internal import BaseClient
-from ...uri import path_to_uri
-from ...utils import on_main_thread, on_new_thread
-from ...lsprotocol.client import Command, CodeAction
-
-
-class DocumentCodeActionMixins(BaseClient):
-
-    code_action_target = None
-
-    @on_new_thread
-    def textdocument_codeaction(
-        self,
-        view: sublime.View,
-        region: sublime.Region,
-        code_action_kinds: Optional[List[str]] = None,
-    ):
-        if not self.session.server_capabilities.get("codeActionProvider", False):
-            return
-        if document := self.session.get_document(view):
-            self.code_action_target = document
-            start = view.rowcol(region.begin())
-            end = view.rowcol(region.end())
-
-            context = {
-                "diagnostics": document.diagnostics,
-                "triggerKind": 2,
-            }
-            if code_action_kinds:
-                context["only"] = list(code_action_kinds)
-
-            self.code_action_request(
-                {
-                    "textDocument": {"uri": path_to_uri(document.file_name)},
-                    "range": {
-                        "start": {"line": start[0], "character": start[1]},
-                        "end": {"line": end[0], "character": end[1]},
-                    },
-                    "context": context,
-                },
-            )
-
-    @on_main_thread
-    def handle_code_action_result(
-        self, context: dict, result: Union[List[Union[Command, CodeAction]], None]
-    ) -> None:
-        if not result:
-            return
-
-        code_actions = result
-
-        def build_title(action: Union[Command, CodeAction]):
-            title = action["title"]
-            if kind := action.get("kind"):
-                return f"{title} ({kind})"
-            return f"{title}"
-
-        titles = [build_title(act) for act in code_actions]
-
-        def on_select_action(index=-1):
-            if index < 0:
-                return
-            self._handle_code_action(context, code_actions[index])
-
-        sublime.active_window().show_quick_panel(
-            titles,
-            on_select=on_select_action,
-            flags=sublime.MONOSPACE_FONT,
-        )
-
-    def _handle_code_action(
-        self, context: dict, action: Union[Command, CodeAction]
-    ) -> None:
-        if edit := action.get("edit"):
-            apply_workspace_edit(self.session, edit)
-        elif command := action.get("command"):
-            self.workspace_executecommand(command)
-        else:
-            self.codeaction_resolve(action)
-
-    def codeaction_resolve(self, params: CodeAction):
-        self.code_action_resolve_request(params)
-
-    def handle_code_action_resolve_result(
-        self, context: dict, result: CodeAction
-    ) -> None:
-        if not result:
-            return
-        self._handle_code_action(self.session, result)
+from .code_action_mixin import DocumentCodeActionMixin
 
 
 class _CodeActionCommand(PluginBase, sublime_plugin.TextCommand):
-    client: DocumentCodeActionMixins
+    client: DocumentCodeActionMixin
 
     @client_must_ready
     @must_valid_document

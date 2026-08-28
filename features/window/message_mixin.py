@@ -14,7 +14,7 @@ _MESSAGE_TYPE_NAME = {
 }
 
 
-class WindowMessageMixins(BaseClient):
+class WindowMessageMixin(BaseClient):
     """Handle LSP window messages and show them in Sublime with sensible UI mapping."""
 
     @on_main_thread
