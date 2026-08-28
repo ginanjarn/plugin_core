@@ -33,7 +33,7 @@ class Context(SafeDict):
     """Context data passed to handlers (e.g., session state, metadata)."""
 
 
-class _MessageExchangeBase:
+class MessageExchangeBase:
     """Base class for message exchange over a transport."""
 
     def __init__(self, transport: Transport):
@@ -125,11 +125,10 @@ class RequestManager:
         self.pending.clear()
 
 
-class ClientCommand(_MessageExchangeBase):
+class ClientCommandMixin(MessageExchangeBase):
     """Client command interface"""
 
-    def __init__(self, transport: Transport):
-        super().__init__(transport)
+    def __init__(self):
         self.request_manager = RequestManager()
 
     def request(self, method: Method, params: Params) -> None:
@@ -164,7 +163,7 @@ class ClientCommand(_MessageExchangeBase):
         self.send(new_notification(method, params))
 
 
-class ServerCommand(_MessageExchangeBase):
+class ServerCommandMixin(MessageExchangeBase):
     """Server command interface"""
 
     def _handle_request(self, context: Context, message: dict) -> None:
@@ -188,11 +187,13 @@ class ServerCommand(_MessageExchangeBase):
             LOGGER.exception("Error handling notification %s", err, exc_info=True)
 
 
-class RPC(ClientCommand, ServerCommand, LSClient):
+class RPC(ClientCommandMixin, ServerCommandMixin, MessageExchangeBase, LSClient):
     """Remote Procedure Call"""
 
     def __init__(self, transport: Transport):
-        super().__init__(transport)
+        MessageExchangeBase.__init__(self, transport)
+        super().__init__()
+
         self.session = Session()
         self._stop_event = threading.Event()
         self._listen_thread: Optional[threading.Thread] = None
