@@ -1,35 +1,26 @@
 import threading
-from typing import List, Optional
 import sublime
 import sublime_plugin
 
 from .plugin_base import PluginBase
+from ..child_process import ProcessArgs
 
 
 class _StartServerCommand(PluginBase, sublime_plugin.TextCommand):
 
     _run_lock = threading.Lock()
 
-    def run(
-        self,
-        edit: sublime.Edit,
-        command: Optional[List[str]] = None,
-        envs: Optional[dict] = None,
-    ):
-        thread = threading.Thread(target=self.run_task, args=(command, envs))
+    def run(self, edit: sublime.Edit, args: dict):
+        thread = threading.Thread(target=self.run_task, args=(args,))
         thread.start()
 
-    def run_task(
-        self,
-        command: Optional[List[str]] = None,
-        envs: Optional[dict] = None,
-    ):
+    def run_task(self, args: dict):
         if self._run_lock.locked():
             return
 
         with self._run_lock:
             try:
-                self.client.server_process.run(command, envs)
+                self.client.server_process.run(ProcessArgs(**args))
                 self.client.connect()
 
                 self.client.initialize(self.view)

@@ -5,6 +5,7 @@ import os
 import shlex
 import subprocess
 import threading
+from dataclasses import dataclass
 from functools import wraps
 from io import BytesIO
 from pathlib import Path
@@ -41,15 +42,25 @@ def recover_exception(
     return wrapper
 
 
+@dataclass
+class ProcessArgs:
+    command: List[str]
+    cwd: Optional[Path] = None
+    env: Optional[dict] = None
+
+    def __post_init__(self):
+        if not isinstance(self.command, list):
+            raise TypeError(f"invalid 'command' type: expected {list}")
+        self.command = [str(el) for el in self.command]
+
+
 class ChildProcess:
     """Wrapper around subprocess.Popen with safe lifecycle management."""
 
-    def __init__(self, command: List[str], cwd: Optional[Path] = None):
-        if not isinstance(command, list):
-            raise ValueError("command must be a list of str")
-
-        self.command = command
-        self.cwd = cwd
+    def __init__(self, args: ProcessArgs):
+        self.command = args.command
+        self.cwd = args.cwd
+        self.env = args.env
         self.process: Optional[subprocess.Popen] = None
 
         self._switch_lock = threading.RLock()
@@ -61,18 +72,16 @@ class ChildProcess:
         with self._switch_lock:
             return self._is_running
 
-    def run(
-        self,
-        command: Optional[List[str]] = None,
-        env: Optional[dict] = None,
-    ) -> None:
+    def run(self, args: ProcessArgs) -> None:
         """Start the child process."""
         with self._switch_lock:
             if self._is_running:
                 LOGGER.warning("Process already running, ignoring run()")
                 return
 
-            _command = command or self.command
+            _command = args.command or self.command
+            _env = args.env or self.env
+            _cwd = args.cwd or self.cwd
             LOGGER.info("Executing command: %s", shlex.join(_command))
 
             try:
@@ -81,8 +90,8 @@ class ChildProcess:
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    env=env or None,
-                    cwd=self.cwd or None,
+                    env=_env,
+                    cwd=_cwd,
                     bufsize=0,
                     startupinfo=STARTUPINFO,
                 )
