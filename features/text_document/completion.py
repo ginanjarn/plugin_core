@@ -1,13 +1,11 @@
 from typing import List, Optional
 
 import sublime
-import sublime_plugin
 
-from ..plugin_base import PluginBase, client_must_ready, must_valid_document
 from .completion_mixin import DocumentCompletionMixin
 
 
-class CompletionEventListener(PluginBase, sublime_plugin.ViewEventListener):
+class DocumentCompletionEventMixin:
     """Event listener to trigger and manage completions."""
 
     client: DocumentCompletionMixin
@@ -16,8 +14,6 @@ class CompletionEventListener(PluginBase, sublime_plugin.ViewEventListener):
         super().__init__(*args, **kwargs)
         self.prev_trigger_location = 0
 
-    @client_must_ready
-    @must_valid_document
     def on_query_completions(
         self, prefix: str, locations: List[int]
     ) -> Optional[sublime.CompletionList]:

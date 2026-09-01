@@ -1,30 +1,20 @@
 from typing import List, Optional
 
 import sublime
-import sublime_plugin
 
-from ..plugin_base import (
-    PluginBase,
-    client_must_ready,
-    must_valid_document,
-    is_valid_document,
-)
 from .signature_help_mixin import DocumentSignatureHelpMixin
 
 
-class _DocumentSignatureHelpCommand(PluginBase, sublime_plugin.TextCommand):
+class _DocumentSignatureHelpCommandMixin:
     client: DocumentSignatureHelpMixin
 
-    @client_must_ready
     def run(self, edit: sublime.Edit) -> None:
-        if not is_valid_document(self.view):
-            return
         point = self.view.sel()[0].begin()
         row, column = self.view.rowcol(point)
         self.client.textdocument_signaturehelp(self.view, row, column)
 
 
-class DocumentSignatureHelpEventListener(PluginBase, sublime_plugin.ViewEventListener):
+class DocumentSignatureHelpEventMixin:
     """
     Trigger signature help on typing trigger characters and hide popup on cursor movement.
     Uses server-provided triggerCharacters when available.
@@ -34,8 +24,6 @@ class DocumentSignatureHelpEventListener(PluginBase, sublime_plugin.ViewEventLis
     _trigger_characters: Optional[List[str]] = None
     insert_commands = {"insert", "insert_snippet", "insert_completion"}
 
-    @client_must_ready
-    @must_valid_document
     def on_modified_async(self) -> None:
         # Only react to insert-like commands to avoid triggering on non-insert edits
         name, *_ = self.view.command_history(0)
@@ -54,8 +42,6 @@ class DocumentSignatureHelpEventListener(PluginBase, sublime_plugin.ViewEventLis
             row, column = self.view.rowcol(point)
             self.client.textdocument_signaturehelp(self.view, row, column)
 
-    @client_must_ready
-    @must_valid_document
     def on_selection_modified_async(self) -> None:
         # hide popup when the selection moves away (user navigates)
         try:

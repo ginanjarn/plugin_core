@@ -1,17 +1,15 @@
 import threading
 import sublime
-import sublime_plugin
 
-from .plugin_base import PluginBase
 from ..child_process import ProcessArgs
 
 
-class _StartServerCommand(PluginBase, sublime_plugin.TextCommand):
+class _StartServerCommandMixin:
 
     _run_lock = threading.Lock()
 
-    def run(self, edit: sublime.Edit, args: dict):
-        thread = threading.Thread(target=self.run_task, args=(args,))
+    def run(self, edit: sublime.Edit, process_args: dict):
+        thread = threading.Thread(target=self.run_task, args=(process_args,))
         thread.start()
 
     def run_task(self, args: dict):
@@ -31,18 +29,8 @@ class _StartServerCommand(PluginBase, sublime_plugin.TextCommand):
             except Exception as err:
                 print("start server error:", err)
 
-    def is_visible(self):
-        if not self.client:
-            return False
-        return not self.client.is_ready()
 
-
-class _TerminateServerCommand(PluginBase, sublime_plugin.TextCommand):
+class _TerminateServerCommandMixin:
 
     def run(self, edit: sublime.Edit):
         self.client.disconnect()
-
-    def is_visible(self):
-        if not self.client:
-            return False
-        return self.client.is_ready()

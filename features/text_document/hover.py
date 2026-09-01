@@ -1,15 +1,11 @@
 import sublime
-import sublime_plugin
 
-from ..plugin_base import PluginBase, client_must_ready, must_valid_document
 from .hover_mixin import DocumentHoverMixin
 
 
-class HoverEventListener(PluginBase, sublime_plugin.ViewEventListener):
+class DocumentHoverEventMixin:
     client: DocumentHoverMixin
 
-    @client_must_ready
-    @must_valid_document
     def on_hover(self, point: int, hover_zone: sublime.HoverZone) -> None:
         if hover_zone != sublime.HoverZone.TEXT:
             return

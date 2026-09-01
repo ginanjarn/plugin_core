@@ -76,8 +76,11 @@ class WorkspaceUpdater:
     @staticmethod
     def _apply_view_changes(view: sublime.View, text_changes: List[TextChange]):
         view.run_command(
-            f"{COMMAND_PREFIX}_apply_text_changes",
-            {"changes": [asdict(c) for c in text_changes]},
+            COMMAND_PREFIX,
+            {
+                "action": "apply_text_change",
+                "changes": [asdict(c) for c in text_changes],
+            },
         )
 
     @staticmethod

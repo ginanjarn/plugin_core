@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 
 import sublime
-import sublime_plugin
 
 from ..document import TextChange
 
@@ -16,7 +15,7 @@ class _BufferedTextChange:
     __slots__ = ("region", "old_text", "new_text")
 
 
-class _ApplyTextChangesCommand(sublime_plugin.TextCommand):
+class _ApplyTextChangesCommandMixin:
     """
     Apply text changes serialized from TextChange.
 
