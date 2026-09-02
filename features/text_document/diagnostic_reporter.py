@@ -7,9 +7,8 @@ from typing import Dict, List, Set, Callable
 import sublime
 from sublime import View
 
-from ...sublime_settings import Settings as UserSettings
 from ...document import TextChange
-from ....constant import PACKAGE_NAME, COMMAND_PREFIX
+from ...registry import PACKAGE_NAME, COMMAND_PREFIX, SETTINGS_BASENAME
 
 
 @dataclass
@@ -40,7 +39,7 @@ class ReportManager:
 
     PUBLISH_KEY = "publish_diagnostic"
     CLEAR_KEY = "clear_diagnostic"
-    SETTINGS_TAG = "diagnostic_report_setting"
+    SETTINGS_CHANGE_TAG = "diagnostic_report_setting"
 
     def __init__(self) -> None:
         self._diagnostics_map: Dict[View, List[Diagnostic]] = defaultdict(list)
@@ -54,16 +53,15 @@ class ReportManager:
         self.status_message = StatusMessage(key)
         self.report_panel = ReportPanel(PACKAGE_NAME)
 
-        with UserSettings() as user_settings:
-            user_settings.add_on_change(self.SETTINGS_TAG, self.update_reporter)
-        self.update_reporter()
+        user_settings = sublime.load_settings(SETTINGS_BASENAME)
+        user_settings.add_on_change(self.SETTINGS_CHANGE_TAG, self.update_reporter)
+        self.update_reporter(user_settings)
 
-    def update_reporter(self):
+    def update_reporter(self, user_settings: sublime.Settings):
         # clear existing report
         self.report_publisher.publish(self.CLEAR_KEY)
 
-        with UserSettings() as user_settings:
-            settings = Settings.from_user_settings(user_settings)
+        settings = Settings.from_user_settings(user_settings)
 
         reporters = []
         if settings.highlight_text:

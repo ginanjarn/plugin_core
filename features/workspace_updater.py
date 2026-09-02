@@ -17,7 +17,7 @@ from ..lsprotocol.lsprotocol import (
     RenameFile,
     DeleteFile,
 )
-from ...constant import COMMAND_PREFIX
+from ..registry import COMMAND_PREFIX
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 PathStr = str

@@ -8,8 +8,8 @@ import sublime
 import sublime_plugin
 from sublime import HoverZone
 
-from ..constant import VIEW_SELECTOR
 from .client_internal import BaseClient
+from .registry import VIEW_SELECTOR
 from .features.document_updater import _ApplyTextChangesCommandMixin
 from .features.server_manager import (
     _StartServerCommandMixin,
