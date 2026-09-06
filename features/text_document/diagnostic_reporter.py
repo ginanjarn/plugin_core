@@ -46,7 +46,7 @@ class ReportManager:
         self._active_view: View = None
 
         # reporter publisher
-        self.report_publisher = PubSub()
+        self.report_publisher = Publisher()
 
         key = f"{PACKAGE_NAME}_DIAGNOSTIC"
         self.highlight_text = HighlightText(key)
@@ -106,7 +106,7 @@ class ReportManager:
         self.report_publisher.publish(self.PUBLISH_KEY, view, diagnostic_items)
 
 
-class PubSub:
+class Publisher:
     def __init__(self) -> None:
         self._subscribers: Dict[str, Set[Callable[..., None]]] = defaultdict(set)
 
@@ -136,16 +136,20 @@ class HighlightText(AbstractReporter):
     def __init__(self, region_key: str) -> None:
         self._region_key = region_key
 
+    add_regions_args = {
+        "scope": "string",
+        "icon": "circle",
+        "flags": sublime.DRAW_NO_FILL
+        | sublime.DRAW_NO_OUTLINE
+        | sublime.DRAW_SQUIGGLY_UNDERLINE,
+    }
+
     def show(self, view: View, diagnostics: List[Diagnostic]):
         regions = [d.region for d in diagnostics]
         view.add_regions(
             key=self._region_key,
             regions=regions,
-            scope="string",
-            icon="circle",
-            flags=sublime.DRAW_NO_FILL
-            | sublime.DRAW_NO_OUTLINE
-            | sublime.DRAW_SQUIGGLY_UNDERLINE,
+            **self.add_regions_args,
         )
 
     def clear(self):
@@ -160,7 +164,7 @@ class StatusMessage(AbstractReporter):
 
     def show(self, view: View, diagnostics: List[Diagnostic]):
         err_count = len([d for d in diagnostics if d.severity == 1])
-        warn_count = len([d for d in diagnostics if d.severity == 2])
+        warn_count = len(diagnostics) - err_count
         view.set_status(self._status_key, f"Errors {err_count}, Warnings {warn_count}")
 
     def clear(self):

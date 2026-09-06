@@ -17,7 +17,7 @@ Symbol = namedtuple("Symbol", ["name", "kind", "location", "container_name"])
 class DocumentSymbolMixin(BaseClient):
     """Request document symbols and present them in a quick panel with previews."""
 
-    symbol_target: Optional[object] = None
+    document_symbol_target: Optional[object] = None
 
     @on_new_thread
     def textdocument_symbol(self, view: sublime.View) -> None:
@@ -29,7 +29,7 @@ class DocumentSymbolMixin(BaseClient):
         if not document:
             return
 
-        self.symbol_target = document
+        self.document_symbol_target = document
         self.document_symbol_request(
             {"textDocument": {"uri": path_to_uri(document.file_name)}},
         )
@@ -41,23 +41,20 @@ class DocumentSymbolMixin(BaseClient):
         result: Union[List[SymbolInformation], List[DocumentSymbol], None],
     ) -> None:
         """Handle server response and show symbol selector if still relevant."""
-        if not result or not self.symbol_target:
+        if not result or not self.document_symbol_target:
             return
 
         try:
-            view = self.symbol_target.view
+            view = self.document_symbol_target.view
             symbols = self._flatten_symbols(view, result)
             if not symbols:
                 sublime.status_message("LSP: No symbols found")
-                self.symbol_target = None
                 return
 
             selector = SymbolSelector(view, symbols)
             selector.show_panel()
         except Exception as e:
             print(f"[LSP DocumentSymbol] Error handling result: {e}")
-        finally:
-            self.symbol_target = None
 
     def _flatten_symbols(
         self,

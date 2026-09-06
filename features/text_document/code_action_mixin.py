@@ -4,6 +4,7 @@ import sublime
 
 from ..workspace_updater import apply_workspace_edit
 from ...client_internal import BaseClient
+from ...document import Document
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
 from ...lsprotocol.client import Command, CodeAction
@@ -11,7 +12,7 @@ from ...lsprotocol.client import Command, CodeAction
 
 class DocumentCodeActionMixin(BaseClient):
 
-    code_action_target = None
+    document_code_action_target: Optional[Document] = None
 
     @on_new_thread
     def textdocument_codeaction(
@@ -23,7 +24,7 @@ class DocumentCodeActionMixin(BaseClient):
         if not self.session.server_capabilities.get("codeActionProvider", False):
             return
         if document := self.session.get_document(view):
-            self.code_action_target = document
+            self.document_code_action_target = document
             start = view.rowcol(region.begin())
             end = view.rowcol(region.end())
 
@@ -49,10 +50,8 @@ class DocumentCodeActionMixin(BaseClient):
     def handle_code_action_result(
         self, context: dict, result: Union[List[Union[Command, CodeAction]], None]
     ) -> None:
-        if not result:
+        if not (result and self.document_code_action_target):
             return
-
-        code_actions = result
 
         def build_title(action: Union[Command, CodeAction]):
             title = action["title"]
@@ -60,12 +59,12 @@ class DocumentCodeActionMixin(BaseClient):
                 return f"{title} ({kind})"
             return f"{title}"
 
-        titles = [build_title(act) for act in code_actions]
+        titles = [build_title(act) for act in result]
 
         def on_select_action(index=-1):
             if index < 0:
                 return
-            self._handle_code_action(context, code_actions[index])
+            self._handle_code_action(context, result[index])
 
         sublime.active_window().show_quick_panel(
             titles,

@@ -12,29 +12,31 @@ class DocumentCompletionEventMixin:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.prev_trigger_location = 0
+        self.completion_trigger_point = 0
 
     def on_query_completions(
         self, prefix: str, locations: List[int]
     ) -> Optional[sublime.CompletionList]:
         location = min(locations)
 
-        if self.client.is_completions_available():
+        if self.client.completion_result_available():
             items = self.client.pop_completions()
-            if (not items) or self._is_context_changed(
-                self.view, self.prev_trigger_location, location
+            if (not items) or self._is_completion_context_changed(
+                self.view, self.completion_trigger_point, location
             ):
                 self.hide_completions(self.view)
                 return None
             return sublime.CompletionList(items, flags=sublime.INHIBIT_WORD_COMPLETIONS)
 
-        self.prev_trigger_location = location
+        self.hide_completions(self.view)
+        self.completion_trigger_point = location
         row, col = self.view.rowcol(location)
         self.client.textdocument_completion(self.view, row, col)
-        self.hide_completions(self.view)
         return None
 
-    def _is_context_changed(self, view: sublime.View, old: int, new: int) -> bool:
+    def _is_completion_context_changed(
+        self, view: sublime.View, old: int, new: int
+    ) -> bool:
         """Check if completion context has changed."""
         if old == new:
             return False

@@ -3,8 +3,10 @@ from threading import Lock
 from typing import List, Union, Optional
 
 import sublime
+from sublime import KindId
 
 from ...client_internal import BaseClient
+from ...document import Document
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
 from ...lsprotocol.client import CompletionList, CompletionItem
@@ -17,34 +19,34 @@ class _Empty:
 EMPTY = _Empty()
 
 # Map LSP completion kinds to Sublime kinds
-COMPLETION_KIND_MAP = defaultdict(
+LSP_TO_SUBLIME_KIND_MAP = defaultdict(
     lambda: sublime.KIND_AMBIGUOUS,
     {
-        1: (sublime.KindId.COLOR_ORANGISH, "t", ""),  # text
-        2: (sublime.KindId.FUNCTION, "", ""),  # method
-        3: (sublime.KindId.FUNCTION, "", ""),  # function
-        4: (sublime.KindId.FUNCTION, "c", ""),  # constructor
-        5: (sublime.KindId.VARIABLE, "", ""),  # field
-        6: (sublime.KindId.VARIABLE, "", ""),  # variable
-        7: (sublime.KindId.TYPE, "", ""),  # class
-        8: (sublime.KindId.TYPE, "", ""),  # interface
-        9: (sublime.KindId.NAMESPACE, "", ""),  # module
-        10: (sublime.KindId.VARIABLE, "", ""),  # property
-        11: (sublime.KindId.TYPE, "", ""),  # unit
-        12: (sublime.KindId.COLOR_ORANGISH, "v", ""),  # value
-        13: (sublime.KindId.TYPE, "", ""),  # enum
-        14: (sublime.KindId.KEYWORD, "", ""),  # keyword
-        15: (sublime.KindId.SNIPPET, "s", ""),  # snippet
-        16: (sublime.KindId.VARIABLE, "v", ""),  # color
-        17: (sublime.KindId.VARIABLE, "p", ""),  # file
-        18: (sublime.KindId.VARIABLE, "p", ""),  # reference
-        19: (sublime.KindId.VARIABLE, "p", ""),  # folder
-        20: (sublime.KindId.VARIABLE, "v", ""),  # enum member
-        21: (sublime.KindId.VARIABLE, "c", ""),  # constant
-        22: (sublime.KindId.TYPE, "", ""),  # struct
-        23: (sublime.KindId.TYPE, "e", ""),  # event
-        24: (sublime.KindId.KEYWORD, "", ""),  # operator
-        25: (sublime.KindId.TYPE, "", ""),  # type parameter
+        1: (KindId.COLOR_ORANGISH, "t", "Text"),  # text
+        2: (KindId.FUNCTION, "", "Method"),  # method
+        3: (KindId.FUNCTION, "", "Function"),  # function
+        4: (KindId.FUNCTION, "c", "Constructor"),  # constructor
+        5: (KindId.VARIABLE, "", "Field"),  # field
+        6: (KindId.VARIABLE, "", "Variable"),  # variable
+        7: (KindId.TYPE, "", "Class"),  # class
+        8: (KindId.TYPE, "", "Interface"),  # interface
+        9: (KindId.NAMESPACE, "", "Module"),  # module
+        10: (KindId.VARIABLE, "", "Property"),  # property
+        11: (KindId.TYPE, "", "Unit"),  # unit
+        12: (KindId.COLOR_ORANGISH, "v", "Value"),  # value
+        13: (KindId.TYPE, "", "Enum"),  # enum
+        14: (KindId.KEYWORD, "", "Keyword"),  # keyword
+        15: (KindId.SNIPPET, "s", "Snippet"),  # snippet
+        16: (KindId.VARIABLE, "v", "Color"),  # color
+        17: (KindId.VARIABLE, "p", "File"),  # file
+        18: (KindId.VARIABLE, "p", "Reference"),  # reference
+        19: (KindId.VARIABLE, "p", "Folder"),  # folder
+        20: (KindId.VARIABLE, "v", "EnumMember"),  # enum member
+        21: (KindId.VARIABLE, "c", "Constant"),  # constant
+        22: (KindId.TYPE, "", "Struct"),  # struct
+        23: (KindId.TYPE, "e", "Event"),  # event
+        24: (KindId.KEYWORD, "", "Operator"),  # operator
+        25: (KindId.TYPE, "", "TypeParameter"),  # type parameter
     },
 )
 
@@ -52,17 +54,17 @@ COMPLETION_KIND_MAP = defaultdict(
 class DocumentCompletionMixin(BaseClient):
     """Handles completion requests and caching."""
 
-    AUTO_COMPLETE_ARGUMENTS = {
+    _auto_complete_args = {
         "disable_auto_insert": True,
         "next_completion_if_showing": True,
         "auto_complete_commit_on_tab": True,
     }
 
-    completion_target: Optional[object] = None
+    document_completion_target: Optional[Document] = None
     _cached_completions: Union[List[sublime.CompletionItem], _Empty] = EMPTY
     _cached_completions_lock = Lock()
 
-    def is_completions_available(self) -> bool:
+    def completion_result_available(self) -> bool:
         with self._cached_completions_lock:
             return self._cached_completions is not EMPTY
 
@@ -84,7 +86,7 @@ class DocumentCompletionMixin(BaseClient):
             return
         document = self.session.get_document(view)
         if document:
-            self.completion_target = document
+            self.document_completion_target = document
             self.completion_request(
                 {
                     "position": {"character": col, "line": row},
@@ -97,39 +99,36 @@ class DocumentCompletionMixin(BaseClient):
         self, context: dict, result: Union[List[CompletionItem], CompletionList, None]
     ) -> None:
         """Handle completion results from LSP."""
-        if not result:
+        if not (result and self.document_completion_target):
             return
 
         try:
             if isinstance(result, list):
-                items = [self._build_completion(item) for item in result]
+                items = [self._build_completion_item(item) for item in result]
             else:
                 items = [
-                    self._build_completion(item) for item in result.get("items", [])
+                    self._build_completion_item(item)
+                    for item in result.get("items", [])
                 ]
         except Exception as e:
             print(f"[LSP Completion] Error building completions: {e}")
             return
 
-        if items:
-            self.set_completions(items)
-            if self.completion_target and self.completion_target.view:
-                self.completion_target.view.run_command(
-                    "auto_complete", self.AUTO_COMPLETE_ARGUMENTS
-                )
+        self.set_completions(items)
+        self.document_completion_target.view.run_command(
+            "auto_complete", self._auto_complete_args
+        )
 
     @staticmethod
-    def _build_completion(completion_item: CompletionItem) -> sublime.CompletionItem:
+    def _build_completion_item(item: CompletionItem) -> sublime.CompletionItem:
         """Convert LSP completion item to Sublime completion item."""
-        label = completion_item.get("label", "")
+        label = item.get("label", "")
         insert_text = (
-            completion_item.get("textEdit", {}).get("newText")
-            or completion_item.get("insertText")
-            or label
+            item.get("textEdit", {}).get("newText") or item.get("insertText") or label
         )
-        detail = completion_item.get("detail", "")
-        documentation = completion_item.get("documentation", "")
-        kind = COMPLETION_KIND_MAP[completion_item.get("kind", 1)]
+        detail = item.get("detail", "")
+        documentation = item.get("documentation", "")
+        kind = LSP_TO_SUBLIME_KIND_MAP[item.get("kind", 1)]
 
         annotation = detail or (documentation if isinstance(documentation, str) else "")
         return sublime.CompletionItem.snippet_completion(

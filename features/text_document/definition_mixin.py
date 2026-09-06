@@ -4,6 +4,7 @@ from typing import Optional, List, Union
 import sublime
 
 from ...client_internal import BaseClient
+from ...document import Document
 from ...uri import path_to_uri, uri_to_path
 from ...utils import on_main_thread, on_new_thread
 from ...lsprotocol.client import Definition, Location, DefinitionLink
@@ -15,7 +16,7 @@ LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 class DocumentDefinitionMixin(BaseClient):
     """Handles LSP definition requests and results."""
 
-    definition_target: Optional[object] = None
+    document_definition_target: Optional[Document] = None
 
     @on_new_thread
     def textdocument_definition(self, view: sublime.View, row: int, col: int) -> None:
@@ -23,7 +24,7 @@ class DocumentDefinitionMixin(BaseClient):
             return
         document = self.session.get_document(view)
         if document:
-            self.definition_target = document
+            self.document_definition_target = document
             self.definition_request(
                 {
                     "position": {"character": col, "line": row},
@@ -35,18 +36,15 @@ class DocumentDefinitionMixin(BaseClient):
     def handle_definition_result(
         self, context: dict, result: Union[Definition, List[DefinitionLink], None]
     ) -> None:
-        if not result or not self.definition_target:
+        if not (result and self.document_definition_target):
             return
-
-        view = self.definition_target.view
-        self.definition_target = None  # reset after use
 
         if isinstance(result, list):
             locations = [self._build_location(l) for l in result]
         else:
             locations = [self._build_location(result)]
 
-        LocationSelector(view, locations).show_panel()
+        LocationSelector(self.document_definition_target.view, locations).show_panel()
 
     @staticmethod
     def _build_location(location: Union[Location, DefinitionLink]) -> PathEncodedStr:

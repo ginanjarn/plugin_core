@@ -5,6 +5,7 @@ from typing import Optional, Union, List, Dict, Any
 import sublime
 
 from ...client_internal import BaseClient
+from ...document import Document
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
 from ...lsprotocol.client import SignatureHelp
@@ -12,7 +13,7 @@ from ...lsprotocol.client import SignatureHelp
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
 # Debounce interval in seconds to avoid spamming the server on fast typing
-SIGNATURE_HELP_DEBOUNCE = 0.08
+SIGNATURE_HELP_DEBOUNCE = 0.5
 # Maximum characters shown in a signature popup to avoid huge UI blocks
 MAX_SIGNATURE_CHARS = 6_000
 
@@ -20,9 +21,8 @@ MAX_SIGNATURE_CHARS = 6_000
 class DocumentSignatureHelpMixin(BaseClient):
     """Handle LSP signatureHelp requests and show a transient popup with signature info."""
 
-    signature_help_target: Optional[object] = None
-    _last_request_time: float = 0.0
-    _pending_request: bool = False
+    document_signature_help_target: Optional[Document] = None
+    _last_signature_help_request_time: float = 0.0
 
     @on_new_thread
     def textdocument_signaturehelp(
@@ -39,32 +39,15 @@ class DocumentSignatureHelpMixin(BaseClient):
 
         # Debounce: ignore requests that come too quickly
         now = time.monotonic()
-        if now - self._last_request_time < SIGNATURE_HELP_DEBOUNCE:
-            # mark that a request is pending and schedule a slightly delayed request
-            if not self._pending_request:
-                self._pending_request = True
-
-                # schedule a delayed call on a new thread to avoid blocking
-                def delayed():
-                    time.sleep(SIGNATURE_HELP_DEBOUNCE)
-                    self.textdocument_signaturehelp(view, row, col)
-
-                from threading import Thread
-
-                Thread(target=delayed, daemon=True).start()
+        if now - self._last_signature_help_request_time < SIGNATURE_HELP_DEBOUNCE:
             return
-
-        self._pending_request = False
-        self._last_request_time = now
+        self._last_signature_help_request_time = now
 
         # hide any previous popup
-        if self.signature_help_target:
-            try:
-                self.signature_help_target.view.hide_popup()
-            except Exception:
-                pass
+        if self.document_signature_help_target:
+            self.document_signature_help_target.view.hide_popup()
 
-        self.signature_help_target = document
+        self.document_signature_help_target = document
         self.signature_help_request(
             {
                 "position": {"line": row, "character": col},
@@ -77,10 +60,7 @@ class DocumentSignatureHelpMixin(BaseClient):
         self, context: dict, result: Union[SignatureHelp, None]
     ) -> None:
         """Receive signature help result and show popup if still relevant."""
-        if not result:
-            return
-
-        if not self.signature_help_target:
+        if not (result and self.document_signature_help_target):
             return
 
         try:
@@ -96,7 +76,7 @@ class DocumentSignatureHelpMixin(BaseClient):
         if len(content) > MAX_SIGNATURE_CHARS:
             content = content[: MAX_SIGNATURE_CHARS - 200] + "\n\n... (truncated)"
 
-        view = self.signature_help_target.view
+        view = self.document_signature_help_target.view
         location = view.sel()[0].a if view.sel() else 0
         self.show_signature_popup(view, content, location, markup)
 

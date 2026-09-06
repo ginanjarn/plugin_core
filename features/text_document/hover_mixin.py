@@ -19,7 +19,7 @@ MAX_HOVER_CHARS = 12_000
 class DocumentHoverMixin(BaseClient):
     """Handle LSP hover requests and show popups with diagnostics + hover content."""
 
-    hover_target: Optional[Document] = None
+    document_hover_target: Optional[Document] = None
     hover_point: int = 0
     diagnostic_message: str = ""
 
@@ -30,26 +30,17 @@ class DocumentHoverMixin(BaseClient):
             return
 
         # Hide previous popup if any
-        if self.hover_target:
-            try:
-                self.hover_target.view.hide_popup()
-            except Exception:
-                pass
+        if self.document_hover_target:
+            self.document_hover_target.view.hide_popup()
 
         document = self.session.get_document(view)
         if not document:
             return
 
         self.hover_point = view.text_point(row, col)
-        self.diagnostic_message = self._get_diagnostic_message(document, row, col)
-        if self.diagnostic_message:
-            # show diagnostics immediately (markdown)
-            self.show_hover_popup(
-                view, self.diagnostic_message, self.hover_point, "markdown"
-            )
+        self.document_hover_target = document
 
-        self.hover_target = document
-        # send request; include request_id in context so handler can check it
+        self._show_hovered_diagnostic_message(document, row, col)
         self.hover_request(
             {
                 "position": {"character": col, "line": row},
@@ -60,10 +51,7 @@ class DocumentHoverMixin(BaseClient):
     @on_main_thread
     def handle_hover_result(self, context: dict, result: Union[Hover, None]) -> None:
         """Receive hover result and show popup if still relevant."""
-        if not result:
-            return
-
-        if not self.hover_target:
+        if not (result and self.document_hover_target):
             return
 
         try:
@@ -73,8 +61,8 @@ class DocumentHoverMixin(BaseClient):
             return
 
         contents: List[str] = []
-        if self.diagnostic_message:
-            contents.append(self.diagnostic_message)
+        if self._hover_diagnostic_message:
+            contents.append(self._hover_diagnostic_message)
 
         if text:
             # truncate very long hover content
@@ -88,7 +76,7 @@ class DocumentHoverMixin(BaseClient):
         hr_line = "\n***\n"
         combined = hr_line.join(contents)
         self.show_hover_popup(
-            self.hover_target.view, combined, self.hover_point, markup
+            self.document_hover_target.view, combined, self.hover_point, markup
         )
 
     def _get_hover_content(self, hover: Hover) -> tuple:
@@ -164,6 +152,17 @@ class DocumentHoverMixin(BaseClient):
                 "markup": markup,
             },
         )
+
+    def _show_hovered_diagnostic_message(self, document: Document, row: int, col: int):
+        try:
+            self._hover_diagnostic_message = self._get_diagnostic_message(document, row, col)
+            if self._hover_diagnostic_message:
+                # show diagnostics immediately (markdown)
+                self.show_hover_popup(
+                    document.view, self._hover_diagnostic_message, self.hover_point, "markdown"
+                )
+        except Exception:
+            pass
 
     @staticmethod
     def _get_diagnostic_message(document: Document, row: int, col: int) -> str:

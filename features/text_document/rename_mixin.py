@@ -16,7 +16,7 @@ LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 class DocumentRenameMixin(BaseClient):
     """Handle LSP prepareRename and rename requests with safer defaults and UX."""
 
-    rename_target: Optional[Document] = None
+    document_rename_target: Optional[Document] = None
 
     @on_new_thread
     def textdocument_preparerename(
@@ -31,7 +31,7 @@ class DocumentRenameMixin(BaseClient):
         if not document:
             return
 
-        self.rename_target = document
+        self.document_rename_target = document
         self.prepare_rename_request(
             {
                 "position": {"character": col, "line": row},
@@ -45,9 +45,8 @@ class DocumentRenameMixin(BaseClient):
     ) -> None:
         """Validate prepareRename result and prompt user for new name."""
 
-        if not result or not self.rename_target:
+        if not result or not self.document_rename_target:
             sublime.status_message("LSP: Cannot rename here")
-            self.rename_target = None
             return
 
         # result can be a range or an object with range and placeholder
@@ -63,13 +62,11 @@ class DocumentRenameMixin(BaseClient):
 
             if not symbol_range:
                 sublime.status_message("LSP: Rename not available at this location")
-                self.rename_target = None
                 return
 
-            self._prompt_rename(self.rename_target, symbol_range, placeholder)
+            self._prompt_rename(self.document_rename_target, symbol_range, placeholder)
         except Exception as e:
             print(f"[LSP Rename] Error handling prepareRename result: {e}")
-            self.rename_target = None
 
     def _prompt_rename(
         self, document: object, symbol_range: dict, placeholder: Optional[str]
@@ -83,7 +80,6 @@ class DocumentRenameMixin(BaseClient):
             end_point = view.text_point(end.line, end.character)
         except Exception as e:
             print(f"[LSP Rename] Invalid range in prepareRename: {e}")
-            self.rename_target = None
             return
 
         region = sublime.Region(start_point, end_point)
@@ -93,11 +89,9 @@ class DocumentRenameMixin(BaseClient):
         def request_rename(new_name: str) -> None:
             if not new_name:
                 sublime.status_message("LSP: Rename cancelled")
-                self.rename_target = None
                 return
             if new_name == old_name:
                 sublime.status_message("LSP: Name unchanged")
-                self.rename_target = None
                 return
             # perform rename on background thread
             self.textdocument_rename(view, row, col, new_name)
@@ -107,7 +101,7 @@ class DocumentRenameMixin(BaseClient):
             initial_text=old_name,
             on_done=request_rename,
             on_change=None,
-            on_cancel=lambda: setattr(self, "rename_target", None),
+            on_cancel=None,
         )
 
     @on_new_thread
@@ -131,7 +125,7 @@ class DocumentRenameMixin(BaseClient):
             sublime.status_message("LSP: Document not available for rename")
             return
 
-        self.rename_target = document
+        self.document_rename_target = document
         sublime.status_message("LSP: Renaming symbol...")
         self.rename_request(
             {
@@ -148,7 +142,6 @@ class DocumentRenameMixin(BaseClient):
         """Apply workspace edit returned by the server and reset state."""
         if not result:
             sublime.status_message("LSP: No changes from rename")
-            self.rename_target = None
             return
 
         try:
@@ -157,5 +150,3 @@ class DocumentRenameMixin(BaseClient):
         except Exception as e:
             print(f"[LSP Rename] Error applying workspace edit: {e}")
             sublime.status_message("LSP: Rename failed")
-        finally:
-            self.rename_target = None

@@ -9,13 +9,10 @@ class DocumentHoverEventMixin:
     def on_hover(self, point: int, hover_zone: sublime.HoverZone) -> None:
         if hover_zone != sublime.HoverZone.TEXT:
             return
-        row, col = self.view.rowcol(point)
-        self._on_hover_task(self.view, row, col)
 
-    def _on_hover_task(self, view: sublime.View, row: int, col: int) -> None:
-        # Ensure document is open in session and then request hover
-        try:
-            self.client.textdocument_didopen(view)
-        except Exception:
-            pass
-        self.client.textdocument_hover(view, row, col)
+        # Pointer may hover on inactive view. Sync opened document to server.
+        if self.view != sublime.active_window().active_view():
+            self.client.textdocument_didopen(self.view)
+
+        row, col = self.view.rowcol(point)
+        self.client.textdocument_hover(self.view, row, col)
