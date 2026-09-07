@@ -1,9 +1,9 @@
 """JSON-RPC 2.0 message utilities"""
 
-from json import loads, dumps, JSONDecodeError
-from typing import Optional, Union, Dict, Any, TypedDict
-
-from .errors import ParseError
+from dataclasses import is_dataclass, asdict
+from enum import Enum
+from json import loads, dumps
+from typing import Optional, List, Tuple, Union, Dict, Any, TypedDict
 
 # Type aliases
 Method = str
@@ -58,23 +58,36 @@ def loads_rpc2(json_str: Union[str, bytes]) -> Dict[str, Any]:
     """Load a JSON-RPC 2.0 message.
 
     Raises:
-        ParseError: if JSON parsing fails
+        JSONDecodeError: if JSON parsing fails
         ValueError: if jsonrpc version is invalid
     """
-    try:
-        dct = loads(json_str)
-    except JSONDecodeError as err:
-        raise ParseError(str(err)) from err
-
+    dct = loads(json_str)
     if dct.get(JSONRPC_KEY) != JSONRPC_VERSION:
         raise ValueError("Invalid or missing jsonrpc version")
 
     return dct
 
 
+def _dict_factory(dc_fields: List[Tuple[str, Any]]) -> Dict[str, Any]:
+    def _get_value(obj: Any) -> Any:
+        if isinstance(obj, Enum):
+            return obj.value
+        return obj
+
+    return {k: _get_value(v) for k, v in dc_fields}
+
+
+def _dumps_fallback(obj: Any) -> Any:
+    if isinstance(obj, Enum):
+        return obj.value
+    if is_dataclass(obj):
+        return asdict(obj, dict_factory=_dict_factory)
+    raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
+
+
 def dumps_rpc2(message: Dict[str, Any], as_bytes: bool = False) -> Union[str, bytes]:
     """Dump a JSON-RPC 2.0 message."""
     msg = dict(message)  # copy to avoid mutating caller's dict
     msg[JSONRPC_KEY] = JSONRPC_VERSION
-    json_str = dumps(msg)
+    json_str = dumps(msg, default=_dumps_fallback)
     return json_str.encode() if as_bytes else json_str
