@@ -17,6 +17,15 @@ _MESSAGE_TYPE_NAME = {
 class WindowMessageMixin(BaseClient):
     """Handle LSP window messages and show them in Sublime with sensible UI mapping."""
 
+    def set_client_capabilities(self):
+        self.session.client_capabilities["window"].update(
+            {
+                "showMessage": {
+                    "messageActionItem": {"additionalPropertiesSupport": False}
+                }
+            }
+        )
+
     @on_main_thread
     def handle_log_message_notification(
         self, context: Dict[str, Any], params: LogMessageParams

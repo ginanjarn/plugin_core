@@ -14,6 +14,39 @@ class DocumentCodeActionMixin(BaseClient):
 
     document_code_action_target: Optional[Document] = None
 
+    def set_client_capabilities(self):
+        self.session.client_capabilities["textDocument"].update(
+            {
+                "codeAction": {
+                    "dynamicRegistration": False,
+                    "codeActionLiteralSupport": {
+                        "codeActionKind": {
+                            "valueSet": [
+                                "",
+                                "quickfix",
+                                "refactor",
+                                "refactor.extract",
+                                "refactor.inline",
+                                "refactor.move",
+                                "refactor.rewrite",
+                                "source",
+                                "source.organizeImports",
+                                "source.fixAll",
+                                "notebook",
+                            ]
+                        }
+                    },
+                    "isPreferredSupport": False,
+                    "disabledSupport": False,
+                    "dataSupport": False,
+                    "resolveSupport": {"properties": []},
+                    "honorsChangeAnnotations": False,
+                    "documentationSupport": False,
+                    "tagSupport": {"valueSet": [1]},
+                }
+            }
+        )
+
     @on_new_thread
     def textdocument_codeaction(
         self,

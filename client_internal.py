@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from abc import ABC, abstractmethod
 from functools import wraps
 from typing import Optional, Dict, Any
 
@@ -264,7 +265,7 @@ class RPC(ClientCommandMixin, ServerCommandMixin, MessageExchangeBase, LSClient)
         return self.handle(context, method, param_or_result)
 
 
-class BaseClient(RPC):
+class BaseClient(RPC, ABC):
     """"""
 
     def __init__(
@@ -274,6 +275,12 @@ class BaseClient(RPC):
     ):
         super().__init__(transport)
         self.server_process = process
+
+        self.set_client_capabilities()
+
+    @abstractmethod
+    def set_client_capabilities(self):
+        """set client capabilities"""
 
     def shutdown(self) -> None:
         """Shutdown the server process."""

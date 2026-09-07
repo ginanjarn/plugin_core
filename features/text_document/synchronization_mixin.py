@@ -18,6 +18,18 @@ class DocumentSynchronizerMixin(BaseClient):
     defensive checks and version management.
     """
 
+    def set_client_capabilities(self):
+        self.session.client_capabilities["textDocument"].update(
+            {
+                "synchronization": {
+                    "dynamicRegistration": False,
+                    "willSave": False,
+                    "willSaveWaitUntil": False,
+                    "didSave": True,
+                }
+            }
+        )
+
     def textdocument_didopen(self, view: sublime.View, *, reload: bool = False) -> None:
         try:
             capabilities = (

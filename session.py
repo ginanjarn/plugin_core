@@ -39,7 +39,11 @@ class Session:
     """Session Base class"""
 
     def __init__(self, **kwargs) -> None:
-        self.client_capabilities: dict = {}
+        self.client_capabilities: dict = {
+            "textDocument": {},
+            "workspace": {},
+            "window": {},
+        }
         self.server_capabilities: dict = {}
         self.status = SessionStatus.NotSet
 

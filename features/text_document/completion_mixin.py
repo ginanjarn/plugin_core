@@ -64,6 +64,59 @@ class DocumentCompletionMixin(BaseClient):
     _cached_completions: Union[List[sublime.CompletionItem], _Empty] = EMPTY
     _cached_completions_lock = Lock()
 
+    def set_client_capabilities(self):
+        self.session.client_capabilities["textDocument"].update(
+            {
+                "completion": {
+                    "dynamicRegistration": False,
+                    "completionItem": {
+                        "snippetSupport": True,
+                        "commitCharactersSupport": False,
+                        "documentationFormat": [],
+                        "deprecatedSupport": False,
+                        "preselectSupport": False,
+                        "tagSupport": {"valueSet": [1]},
+                        "insertReplaceSupport": False,
+                        "resolveSupport": {"properties": []},
+                        "insertTextModeSupport": {"valueSet": [1, 2]},
+                        "labelDetailsSupport": True,
+                    },
+                    "completionItemKind": {
+                        "valueSet": [
+                            1,
+                            2,
+                            3,
+                            4,
+                            5,
+                            6,
+                            7,
+                            8,
+                            9,
+                            10,
+                            11,
+                            12,
+                            13,
+                            14,
+                            15,
+                            16,
+                            17,
+                            18,
+                            19,
+                            20,
+                            21,
+                            22,
+                            23,
+                            24,
+                            25,
+                        ]
+                    },
+                    "insertTextMode": 1,
+                    "contextSupport": False,
+                    "completionList": {"itemDefaults": [], "applyKindSupport": False},
+                },
+            }
+        )
+
     def completion_result_available(self) -> bool:
         with self._cached_completions_lock:
             return self._cached_completions is not EMPTY

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from .client_internal import BaseClient
 from .features.initializer_mixin import InitializerMixin
 from .features.text_document.synchronization_mixin import DocumentSynchronizerMixin
@@ -19,15 +17,6 @@ from .features.text_document.code_action_mixin import DocumentCodeActionMixin
 from .features.workspace.execute_command_mixin import WorkspaceExecuteCommandMixin
 from .features.workspace.apply_edit_mixin import WorkspaceApplyEditMixin
 from .features.window.message_mixin import WindowMessageMixin
-
-
-class Singleton(type):
-    _instance = None
-
-    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
-        if not cls._instance:
-            cls._instance = super().__call__(*args, **kwargs)
-        return cls._instance
 
 
 class Client(
@@ -46,6 +35,8 @@ class Client(
     WorkspaceApplyEditMixin,
     WindowMessageMixin,
     BaseClient,
-    metaclass=Singleton,
 ):
     """Client Implementation"""
+
+    def set_client_capabilities(self):
+        super().set_client_capabilities()

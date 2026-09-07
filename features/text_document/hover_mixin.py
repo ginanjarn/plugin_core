@@ -23,6 +23,16 @@ class DocumentHoverMixin(BaseClient):
     hover_point: int = 0
     diagnostic_message: str = ""
 
+    def set_client_capabilities(self):
+        self.session.client_capabilities["textDocument"].update(
+            {
+                "hover": {
+                    "dynamicRegistration": False,
+                    "contentFormat": ["markdown", "plaintext"],
+                }
+            }
+        )
+
     @on_new_thread
     def textdocument_hover(self, view: sublime.View, row: int, col: int) -> None:
         """Send hover request to the server. Cancel/replace any pending hover."""
@@ -155,11 +165,16 @@ class DocumentHoverMixin(BaseClient):
 
     def _show_hovered_diagnostic_message(self, document: Document, row: int, col: int):
         try:
-            self._hover_diagnostic_message = self._get_diagnostic_message(document, row, col)
+            self._hover_diagnostic_message = self._get_diagnostic_message(
+                document, row, col
+            )
             if self._hover_diagnostic_message:
                 # show diagnostics immediately (markdown)
                 self.show_hover_popup(
-                    document.view, self._hover_diagnostic_message, self.hover_point, "markdown"
+                    document.view,
+                    self._hover_diagnostic_message,
+                    self.hover_point,
+                    "markdown",
                 )
         except Exception:
             pass

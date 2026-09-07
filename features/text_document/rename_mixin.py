@@ -18,6 +18,18 @@ class DocumentRenameMixin(BaseClient):
 
     document_rename_target: Optional[Document] = None
 
+    def set_client_capabilities(self):
+        self.session.client_capabilities["textDocument"].update(
+            {
+                "rename": {
+                    "dynamicRegistration": False,
+                    "prepareSupport": True,
+                    "prepareSupportDefaultBehavior": 1,
+                    "honorsChangeAnnotations": False,
+                }
+            }
+        )
+
     @on_new_thread
     def textdocument_preparerename(
         self, view: sublime.View, row: int, col: int

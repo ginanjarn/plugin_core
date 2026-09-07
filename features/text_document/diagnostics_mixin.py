@@ -14,6 +14,27 @@ LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 class DocumentDiagnosticsMixin(BaseClient):
     """Handles diagnostics notifications from the language server."""
 
+    def set_client_capabilities(self):
+        self.session.client_capabilities["textDocument"].update(
+            {
+                "diagnostic": {
+                    "relatedInformation": False,
+                    "tagSupport": {"valueSet": [1, 2]},
+                    "codeDescriptionSupport": False,
+                    "dataSupport": False,
+                    "dynamicRegistration": False,
+                    "relatedDocumentSupport": False,
+                },
+                "publishDiagnostics": {
+                    "relatedInformation": False,
+                    "tagSupport": {"valueSet": [1, 2]},
+                    "codeDescriptionSupport": False,
+                    "dataSupport": False,
+                    "versionSupport": False,
+                },
+            }
+        )
+
     @on_main_thread
     def handle_publish_diagnostics_notification(
         self, context: dict, params: PublishDiagnosticsParams

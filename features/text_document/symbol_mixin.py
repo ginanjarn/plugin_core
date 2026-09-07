@@ -19,6 +19,48 @@ class DocumentSymbolMixin(BaseClient):
 
     document_symbol_target: Optional[object] = None
 
+    def set_client_capabilities(self):
+        self.session.client_capabilities["textDocument"].update(
+            {
+                "documentSymbol": {
+                    "dynamicRegistration": False,
+                    "symbolKind": {
+                        "valueSet": [
+                            1,
+                            2,
+                            3,
+                            4,
+                            5,
+                            6,
+                            7,
+                            8,
+                            9,
+                            10,
+                            11,
+                            12,
+                            13,
+                            14,
+                            15,
+                            16,
+                            17,
+                            18,
+                            19,
+                            20,
+                            21,
+                            22,
+                            23,
+                            24,
+                            25,
+                            26,
+                        ]
+                    },
+                    "hierarchicalDocumentSymbolSupport": False,
+                    "tagSupport": {"valueSet": [1]},
+                    "labelSupport": False,
+                }
+            }
+        )
+
     @on_new_thread
     def textdocument_symbol(self, view: sublime.View) -> None:
         """Request document symbols if supported by the server."""

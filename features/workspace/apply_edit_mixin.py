@@ -19,6 +19,22 @@ class WorkspaceApplyEditMixin(BaseClient):
       - failedChange: optional object (when available)
     """
 
+    def set_client_capabilities(self):
+        self.session.client_capabilities["workspace"].update(
+            {
+                "applyEdit": True,
+                "workspaceEdit": {
+                    "documentChanges": True,
+                    "resourceOperations": ["create", "rename", "delete"],
+                    "failureHandling": "abort",
+                    "normalizesLineEndings": True,
+                    "changeAnnotationSupport": {"groupsOnLabel": False},
+                    "metadataSupport": False,
+                    "snippetEditSupport": False,
+                },
+            }
+        )
+
     @on_main_thread
     def handle_apply_workspace_edit_request(
         self, context: Dict[str, Any], params: ApplyWorkspaceEditParams

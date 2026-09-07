@@ -24,6 +24,22 @@ class DocumentSignatureHelpMixin(BaseClient):
     document_signature_help_target: Optional[Document] = None
     _last_signature_help_request_time: float = 0.0
 
+    def set_client_capabilities(self):
+        self.session.client_capabilities["textDocument"].update(
+            {
+                "signatureHelp": {
+                    "dynamicRegistration": False,
+                    "signatureInformation": {
+                        "documentationFormat": ["markdown"],
+                        "parameterInformation": {"labelOffsetSupport": False},
+                        "activeParameterSupport": False,
+                        "noActiveParameterSupport": False,
+                    },
+                    "contextSupport": False,
+                }
+            }
+        )
+
     @on_new_thread
     def textdocument_signaturehelp(
         self, view: sublime.View, row: int, col: int

@@ -18,6 +18,11 @@ class DocumentDefinitionMixin(BaseClient):
 
     document_definition_target: Optional[Document] = None
 
+    def set_client_capabilities(self):
+        self.session.client_capabilities["textDocument"].update(
+            {"definition": {"dynamicRegistration": False, "linkSupport": False}}
+        )
+
     @on_new_thread
     def textdocument_definition(self, view: sublime.View, row: int, col: int) -> None:
         if not self.session.server_capabilities.get("definitionProvider"):

@@ -9,6 +9,10 @@ LOGGER = logging.getLogger(__name__)
 
 
 class WorkspaceExecuteCommandMixin(BaseClient):
+    def set_client_capabilities(self):
+        self.session.client_capabilities["workspace"].update(
+            {"executeCommand": {"dynamicRegistration": False}}
+        )
 
     @on_new_thread
     def workspace_executecommand(self, commands: dict):
