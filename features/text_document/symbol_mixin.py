@@ -3,7 +3,7 @@ from typing import List, Union, Optional, Tuple, Dict, Any
 
 import sublime
 
-from ...client_internal import BaseClient
+from ...client_internal import BaseClient, require_server_capability
 from ...uri import path_to_uri, uri_to_path
 from ...utils import on_main_thread, on_new_thread
 from ...lsprotocol.client import SymbolInformation, DocumentSymbol
@@ -62,10 +62,9 @@ class DocumentSymbolMixin(BaseClient):
         )
 
     @on_new_thread
+    @require_server_capability("documentSymbolProvider")
     def textdocument_symbol(self, view: sublime.View) -> None:
         """Request document symbols if supported by the server."""
-        if not self.session.server_capabilities.get("documentSymbolProvider", False):
-            return
 
         document = self.session.get_document(view)
         if not document:

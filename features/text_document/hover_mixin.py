@@ -4,7 +4,7 @@ from typing import Union, Optional, List
 
 import sublime
 
-from ...client_internal import BaseClient
+from ...client_internal import BaseClient, require_server_capability
 from ...document import Document
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
@@ -34,10 +34,9 @@ class DocumentHoverMixin(BaseClient):
         )
 
     @on_new_thread
+    @require_server_capability("hoverProvider")
     def textdocument_hover(self, view: sublime.View, row: int, col: int) -> None:
         """Send hover request to the server. Cancel/replace any pending hover."""
-        if not self.session.server_capabilities.get("hoverProvider", False):
-            return
 
         # Hide previous popup if any
         if self.document_hover_target:

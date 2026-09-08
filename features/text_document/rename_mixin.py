@@ -4,7 +4,7 @@ from typing import Optional, Union, Dict, Any
 import sublime
 
 from ..workspace_updater import apply_workspace_edit
-from ...client_internal import BaseClient
+from ...client_internal import BaseClient, require_server_capability
 from ...document import Document
 from ...uri import path_to_uri
 from ...lsprotocol.client import PrepareRenameResult, WorkspaceEdit as LspWorkspaceEdit
@@ -31,13 +31,11 @@ class DocumentRenameMixin(BaseClient):
         )
 
     @on_new_thread
+    @require_server_capability("renameProvider")
     def textdocument_preparerename(
         self, view: sublime.View, row: int, col: int
     ) -> None:
         """Ask server whether rename is allowed at the given position."""
-        if not self.session.server_capabilities.get("renameProvider", False):
-            sublime.status_message("LSP: Rename not supported by server")
-            return
 
         document = self.session.get_document(view)
         if not document:
@@ -117,13 +115,11 @@ class DocumentRenameMixin(BaseClient):
         )
 
     @on_new_thread
+    @require_server_capability("renameProvider")
     def textdocument_rename(
         self, view: sublime.View, row: int, col: int, new_name: str
     ) -> None:
         """Send rename request and apply resulting workspace edit."""
-        if not self.session.server_capabilities.get("renameProvider", False):
-            sublime.status_message("LSP: Rename not supported by server")
-            return
 
         # Save all open documents to ensure server has latest content
         for doc in self.session.get_documents():

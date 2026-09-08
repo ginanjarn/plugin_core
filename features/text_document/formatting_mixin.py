@@ -3,7 +3,7 @@ from typing import List, Union, Optional
 import sublime
 
 from ..workspace_updater import apply_text_edits
-from ...client_internal import BaseClient
+from ...client_internal import BaseClient, require_server_capability
 from ...document import Document
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
@@ -21,10 +21,9 @@ class DocumentFormattingMixin(BaseClient):
         )
 
     @on_new_thread
+    @require_server_capability("documentFormattingProvider")
     def textdocument_formatting(self, view: sublime.View) -> None:
-        if not self.session.server_capabilities.get("documentFormattingProvider"):
-            sublime.status_message("LSP: Formatting not supported by server")
-            return
+
         document = self.session.get_document(view)
         if document:
             self.document_formatting_target = document

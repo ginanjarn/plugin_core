@@ -291,3 +291,18 @@ class BaseClient(RPC, ABC):
             LOGGER.warning("Error sending shutdown/exit: %s", err)
         finally:
             self.server_process.terminate()
+
+
+def require_server_capability(capability: str):
+    """call function if required capability satisfied"""
+
+    def inner_fn(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            if self.session.server_capabilities.get(capability):
+                return func(self, *args, **kwargs)
+            return None
+
+        return wrapper
+
+    return inner_fn

@@ -4,7 +4,7 @@ from typing import Optional, Union, List, Dict, Any
 
 import sublime
 
-from ...client_internal import BaseClient
+from ...client_internal import BaseClient, require_server_capability
 from ...document import Document
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
@@ -41,13 +41,11 @@ class DocumentSignatureHelpMixin(BaseClient):
         )
 
     @on_new_thread
+    @require_server_capability("signatureHelpProvider")
     def textdocument_signaturehelp(
         self, view: sublime.View, row: int, col: int
     ) -> None:
         """Send signatureHelp request to the server with debounce and stale-response protection."""
-        capabilities = self.session.server_capabilities.get("signatureHelpProvider", {})
-        if not capabilities:
-            return
 
         document = self.session.get_document(view)
         if not document:

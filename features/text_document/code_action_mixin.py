@@ -3,7 +3,7 @@ from typing import List, Optional, Union
 import sublime
 
 from ..workspace_updater import apply_workspace_edit
-from ...client_internal import BaseClient
+from ...client_internal import BaseClient, require_server_capability
 from ...document import Document
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
@@ -48,14 +48,13 @@ class DocumentCodeActionMixin(BaseClient):
         )
 
     @on_new_thread
+    @require_server_capability("codeActionProvider")
     def textdocument_codeaction(
         self,
         view: sublime.View,
         region: sublime.Region,
         code_action_kinds: Optional[List[str]] = None,
     ):
-        if not self.session.server_capabilities.get("codeActionProvider", False):
-            return
         if document := self.session.get_document(view):
             self.document_code_action_target = document
             start = view.rowcol(region.begin())

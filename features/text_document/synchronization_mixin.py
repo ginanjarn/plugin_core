@@ -2,7 +2,7 @@ from typing import List
 
 import sublime
 
-from ...client_internal import BaseClient
+from ...client_internal import BaseClient, require_server_capability
 from ...document import Document, TextChange
 from ...uri import path_to_uri
 from ...lsprotocol.lsprotocol import TextDocumentContentChangePartial
@@ -30,14 +30,9 @@ class DocumentSynchronizerMixin(BaseClient):
             }
         )
 
+    @require_server_capability("textDocumentSync")
     def textdocument_didopen(self, view: sublime.View, *, reload: bool = False) -> None:
         try:
-            capabilities = (
-                self.session.server_capabilities.get("textDocumentSync", {}) or {}
-            )
-            if not capabilities.get("openClose", False):
-                return
-
             if not (view and view.is_valid()):
                 return
 
@@ -83,14 +78,9 @@ class DocumentSynchronizerMixin(BaseClient):
         except Exception:
             print("[LSP Sync] Error in didOpen")
 
+    @require_server_capability("textDocumentSync")
     def textdocument_didsave(self, view: sublime.View) -> None:
         try:
-            capabilities = (
-                self.session.server_capabilities.get("textDocumentSync", {}) or {}
-            )
-            if not capabilities.get("save", False):
-                return
-
             document = self.session.get_document(view)
             if document and view.file_name():
                 self.did_save_text_document_notification(
@@ -102,14 +92,9 @@ class DocumentSynchronizerMixin(BaseClient):
         except Exception:
             print("[LSP Sync] Error in didSave")
 
+    @require_server_capability("textDocumentSync")
     def textdocument_didclose(self, view: sublime.View) -> None:
         try:
-            capabilities = (
-                self.session.server_capabilities.get("textDocumentSync", {}) or {}
-            )
-            if not capabilities.get("openClose", False):
-                return
-
             # Remove diagnostics for this view
             self.session.diagnostic_reporter.delete(view)
 
@@ -131,16 +116,11 @@ class DocumentSynchronizerMixin(BaseClient):
         except Exception:
             print("[LSP Sync] Error in didClose")
 
+    @require_server_capability("textDocumentSync")
     def textdocument_didchange(
         self, view: sublime.View, changes: List[TextChange]
     ) -> None:
         try:
-            capabilities = (
-                self.session.server_capabilities.get("textDocumentSync", {}) or {}
-            )
-            change_mode = capabilities.get("change", 0)
-            if not change_mode:
-                return
 
             document = self.session.get_document(view)
             if not document:
@@ -149,6 +129,8 @@ class DocumentSynchronizerMixin(BaseClient):
                 document = self.session.get_document(view)
                 if not document:
                     return
+
+            change_mode = self.session.server_capabilities["textDocumentSync"]["change"]
 
             # Build contentChanges according to server's supported mode
             if change_mode == 1:

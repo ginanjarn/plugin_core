@@ -3,7 +3,7 @@ from typing import Optional, List, Union
 
 import sublime
 
-from ...client_internal import BaseClient
+from ...client_internal import BaseClient, require_server_capability
 from ...document import Document
 from ...uri import path_to_uri, uri_to_path
 from ...utils import on_main_thread, on_new_thread
@@ -24,9 +24,9 @@ class DocumentDefinitionMixin(BaseClient):
         )
 
     @on_new_thread
+    @require_server_capability("definitionProvider")
     def textdocument_definition(self, view: sublime.View, row: int, col: int) -> None:
-        if not self.session.server_capabilities.get("definitionProvider"):
-            return
+
         document = self.session.get_document(view)
         if document:
             self.document_definition_target = document

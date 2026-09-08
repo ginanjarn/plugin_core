@@ -5,7 +5,7 @@ from typing import List, Union, Optional
 import sublime
 from sublime import KindId
 
-from ...client_internal import BaseClient
+from ...client_internal import BaseClient, require_server_capability
 from ...document import Document
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
@@ -132,11 +132,10 @@ class DocumentCompletionMixin(BaseClient):
             return completions if completions is not EMPTY else []
 
     @on_new_thread
+    @require_server_capability("completionProvider")
     def textdocument_completion(self, view: sublime.View, row: int, col: int) -> None:
         """Request completions from the language server."""
-        capabilities = self.session.server_capabilities.get("completionProvider")
-        if not capabilities:
-            return
+
         document = self.session.get_document(view)
         if document:
             self.document_completion_target = document
