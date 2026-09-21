@@ -122,14 +122,14 @@ class ChildProcess:
     def _listen_stderr_task(self):
         """Continuously read stderr and log output."""
         self._stderr_closed_event.clear()
-        prefix = f"[{self.command[0]}]"
+        prefix = f"[{Path(self.command[0]).name}]"
 
         try:
             while True:
                 line = self.stderr.readline()
                 if not line:
                     break
-                LOGGER.error("%s %s", prefix, line.rstrip().decode(errors="replace"))
+                print(f'{prefix} {line.rstrip().decode(errors="replace")}')
         finally:
             self._stderr_closed_event.set()
 
