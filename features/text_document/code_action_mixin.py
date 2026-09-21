@@ -110,6 +110,9 @@ class DocumentCodeActionMixin(BaseClient):
         if edit := action.get("edit"):
             apply_workspace_edit(self.session, edit)
         elif command := action.get("command"):
+            if isinstance(command, str):
+                # action type is Command
+                command = action
             self.workspace_executecommand(command)
         else:
             self.codeaction_resolve(action)
