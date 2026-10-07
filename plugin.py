@@ -132,7 +132,7 @@ class _BaseTextCommand(
         return True
 
 
-class EventListerer(
+class EventListener(
     DocumentSynchronizeEventMixin,
     DocumentCompletionEventMixin,
     DocumentSignatureHelpEventMixin,
