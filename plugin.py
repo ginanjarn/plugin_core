@@ -34,6 +34,7 @@ from .features.text_document.rename import (
     _DocumentRenameCommandMixin,
 )
 from .features.text_document.symbol import _DocumentSymbolCommandMixin
+from .features.workspace.execute_command import _WorkspaceExecuteCommandCommandMixin
 
 LOGGER = logging.getLogger(__name__)
 Point = int
@@ -84,6 +85,7 @@ class _BaseTextCommand(
     _DocumentPrepareRenameCommandMixin,
     _DocumentRenameCommandMixin,
     _DocumentSymbolCommandMixin,
+    _WorkspaceExecuteCommandCommandMixin,
     BasePlugin,
     sublime_plugin.TextCommand,
 ):
@@ -99,6 +101,7 @@ class _BaseTextCommand(
         "document_prepare_rename": _DocumentPrepareRenameCommandMixin,
         "document_rename": _DocumentRenameCommandMixin,
         "document_symbol": _DocumentSymbolCommandMixin,
+        "workspace_execute_command": _WorkspaceExecuteCommandCommandMixin,
     }
 
     def run(

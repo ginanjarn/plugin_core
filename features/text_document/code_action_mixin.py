@@ -8,6 +8,7 @@ from ...document import Document
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
 from ...lsprotocol.client import Command, CodeAction
+from ...registry import COMMAND_PREFIX
 
 
 class DocumentCodeActionMixin(BaseClient):
@@ -113,7 +114,11 @@ class DocumentCodeActionMixin(BaseClient):
             if isinstance(command, str):
                 # action type is Command
                 command = action
-            self.workspace_executecommand(command)
+            view = self.document_code_action_target.view
+            view.run_command(
+                COMMAND_PREFIX,
+                {"action": "workspace_execute_command", "command": command},
+            )
         else:
             self.codeaction_resolve(action)
 

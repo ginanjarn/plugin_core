@@ -15,8 +15,8 @@ class WorkspaceExecuteCommandMixin(BaseClient):
         )
 
     @on_new_thread
-    def workspace_executecommand(self, commands: dict):
-        self.execute_command_request(commands)
+    def workspace_executecommand(self, command: dict):
+        self.execute_command_request(command)
 
     @on_main_thread
     def handle_execute_command_result(
