@@ -74,6 +74,8 @@ def must_valid_document(func):
 
 
 class _BaseTextCommand(
+    sublime_plugin.TextCommand,
+    # comand implementation mixins
     _ApplyTextChangesCommandMixin,
     _StartServerCommandMixin,
     _TerminateServerCommandMixin,
@@ -87,7 +89,6 @@ class _BaseTextCommand(
     _DocumentSymbolCommandMixin,
     _WorkspaceExecuteCommandCommandMixin,
     BasePlugin,
-    sublime_plugin.TextCommand,
 ):
     action_map = {
         "apply_text_change": _ApplyTextChangesCommandMixin,
@@ -104,6 +105,10 @@ class _BaseTextCommand(
         "workspace_execute_command": _WorkspaceExecuteCommandCommandMixin,
     }
 
+    non_initialized_actions = frozenset(
+        {"start_server", "terminate_server", "initialize"}
+    )
+
     def run(
         self, edit: sublime.Edit, action: str, event: Optional[dict] = None, **kwargs
     ):
@@ -119,7 +124,7 @@ class _BaseTextCommand(
                 view_sel().clear()
                 view_sel().add(sublime.Region(text_point))
 
-        if action not in {"start_server", "terminate_server", "initialize"}:
+        if action not in self.non_initialized_actions:
             if not self.client.is_ready():
                 return
 
@@ -128,23 +133,27 @@ class _BaseTextCommand(
         except Exception as err:
             LOGGER.exception("command error: %s", err, exc_info=True)
 
-    def is_visible(self) -> bool:
-        return is_valid_document(self.view)
+    def is_visible(self, action: str = "") -> bool:
+        if self.client and is_valid_document(self.view):
+            if self.client.is_ready():
+                return True
+            return action in self.non_initialized_actions
+
+        return False
 
     def want_event(self) -> bool:
         return True
 
 
 class EventListener(
+    sublime_plugin.ViewEventListener,
+    # listener implementation mixins
     DocumentSynchronizeEventMixin,
     DocumentCompletionEventMixin,
     DocumentSignatureHelpEventMixin,
     DocumentHoverEventMixin,
     BasePlugin,
-    sublime_plugin.ViewEventListener,
 ):
-    def __init__(self, view: sublime.View):
-        super().__init__(view)
 
     @client_must_ready
     @must_valid_document
@@ -202,12 +211,11 @@ class EventListener(
 
 
 class TextChangeListener(
+    sublime_plugin.TextChangeListener,
+    # listener implementation mixins
     DocumentChangeEventMixin,
     BasePlugin,
-    sublime_plugin.TextChangeListener,
 ):
-    def __init__(self):
-        super().__init__()
 
     @client_must_ready
     def on_text_changed(self, changes: List[sublime.TextChange]):
