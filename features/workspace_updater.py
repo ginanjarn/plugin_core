@@ -94,21 +94,29 @@ class WorkspaceUpdater:
         new = uri_to_path(resource_changes["newUri"])
         Path(old).rename(new)
 
-        # retarget buffer to new path
-        for view in [
-            v for v in sublime.active_window().views() if v.file_name() == old
-        ]:
-            view.retarget(new)
+        window = sublime.active_window()
+        active_view = window.active_view()
+
+        if not window.find_open_file(old):
+            # document not opened
+            return
+
+        for view in [v for v in window.views() if v.file_name() == old]:
+            view.close()
+
+        window.open_file(new)
+        # refocus to active view
+        if active_view.file_name() != old:
+            window.focus_view(active_view)
 
     @staticmethod
     def _delete_file(resource_changes: DeleteFile):
         file_name = uri_to_path(resource_changes["textDocument"]["uri"])
         Path(file_name).unlink()
 
+        window = sublime.active_window()
         # close opened view
-        for view in [
-            v for v in sublime.active_window().views() if v.file_name() == file_name
-        ]:
+        for view in [v for v in window.views() if v.file_name() == file_name]:
             view.close()
 
 
