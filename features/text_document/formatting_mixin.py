@@ -13,7 +13,7 @@ from ...lsprotocol.client import TextEdit
 class DocumentFormattingMixin(BaseClient):
     """Handles document formatting requests and results."""
 
-    document_formatting_target: Optional[Document] = None
+    document_formatting_target: Optional[Document]
 
     def set_client_capabilities(self):
         self.session.client_capabilities["textDocument"].update(

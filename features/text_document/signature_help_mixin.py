@@ -21,8 +21,8 @@ MAX_SIGNATURE_CHARS = 6_000
 class DocumentSignatureHelpMixin(BaseClient):
     """Handle LSP signatureHelp requests and show a transient popup with signature info."""
 
-    document_signature_help_target: Optional[Document] = None
-    _last_signature_help_request_time: float = 0.0
+    document_signature_help_target: Optional[Document]
+    _last_signature_help_request_time: float
 
     def set_client_capabilities(self):
         self.session.client_capabilities["textDocument"].update(
@@ -53,15 +53,17 @@ class DocumentSignatureHelpMixin(BaseClient):
 
         # Debounce: ignore requests that come too quickly
         now = time.monotonic()
-        if now - self._last_signature_help_request_time < SIGNATURE_HELP_DEBOUNCE:
+        last_request_time = getattr(self, "_last_signature_help_request_time", 0)
+        if now - last_request_time < SIGNATURE_HELP_DEBOUNCE:
             return
         self._last_signature_help_request_time = now
 
         # hide any previous popup
-        if self.document_signature_help_target:
-            self.document_signature_help_target.view.hide_popup()
+        if prev_target := getattr(self, "document_signature_help_target", None):
+            prev_target.view.hide_popup()
 
         self.document_signature_help_target = document
+        self.signature_help_point = view.text_point(row, col)
         self.signature_help_request(
             {
                 "position": {"line": row, "character": col},
@@ -91,7 +93,7 @@ class DocumentSignatureHelpMixin(BaseClient):
             content = content[: MAX_SIGNATURE_CHARS - 200] + "\n\n... (truncated)"
 
         view = self.document_signature_help_target.view
-        location = view.sel()[0].a if view.sel() else 0
+        location = self.signature_help_point
         self.show_signature_popup(view, content, location, markup)
 
     def _build_signature_content(self, help_obj: SignatureHelp) -> (str, str):

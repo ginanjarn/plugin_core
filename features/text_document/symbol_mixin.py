@@ -17,7 +17,7 @@ Symbol = namedtuple("Symbol", ["name", "kind", "location", "container_name"])
 class DocumentSymbolMixin(BaseClient):
     """Request document symbols and present them in a quick panel with previews."""
 
-    document_symbol_target: Optional[object] = None
+    document_symbol_target: Optional[object]
 
     def set_client_capabilities(self):
         self.session.client_capabilities["textDocument"].update(
@@ -82,7 +82,7 @@ class DocumentSymbolMixin(BaseClient):
         result: Union[List[SymbolInformation], List[DocumentSymbol], None],
     ) -> None:
         """Handle server response and show symbol selector if still relevant."""
-        if not result or not self.document_symbol_target:
+        if not (result and self.document_symbol_target):
             return
 
         try:

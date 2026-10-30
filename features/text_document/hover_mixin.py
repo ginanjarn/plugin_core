@@ -19,9 +19,8 @@ MAX_HOVER_CHARS = 12_000
 class DocumentHoverMixin(BaseClient):
     """Handle LSP hover requests and show popups with diagnostics + hover content."""
 
-    document_hover_target: Optional[Document] = None
-    hover_point: int = 0
-    diagnostic_message: str = ""
+    document_hover_target: Optional[Document]
+    hover_point: int
 
     def set_client_capabilities(self):
         self.session.client_capabilities["textDocument"].update(
@@ -39,8 +38,8 @@ class DocumentHoverMixin(BaseClient):
         """Send hover request to the server. Cancel/replace any pending hover."""
 
         # Hide previous popup if any
-        if self.document_hover_target:
-            self.document_hover_target.view.hide_popup()
+        if prev_target := getattr(self, "document_hover_target", None):
+            prev_target.view.hide_popup()
 
         document = self.session.get_document(view)
         if not document:
@@ -70,8 +69,8 @@ class DocumentHoverMixin(BaseClient):
             return
 
         contents: List[str] = []
-        if self._hover_diagnostic_message:
-            contents.append(self._hover_diagnostic_message)
+        if dmsg := getattr(self, "hovered_diagnostic_message", ""):
+            contents.append(dmsg)
 
         if text:
             # truncate very long hover content
@@ -84,8 +83,9 @@ class DocumentHoverMixin(BaseClient):
 
         hr_line = "\n***\n"
         combined = hr_line.join(contents)
+        hover_point = getattr(self, "hover_point", -1)
         self.show_hover_popup(
-            self.document_hover_target.view, combined, self.hover_point, markup
+            self.document_hover_target.view, combined, hover_point, markup
         )
 
     def _get_hover_content(self, hover: Hover) -> tuple:
@@ -164,19 +164,20 @@ class DocumentHoverMixin(BaseClient):
 
     def _show_hovered_diagnostic_message(self, document: Document, row: int, col: int):
         try:
-            self._hover_diagnostic_message = self._get_diagnostic_message(
-                document, row, col
-            )
-            if self._hover_diagnostic_message:
-                # show diagnostics immediately (markdown)
-                self.show_hover_popup(
-                    document.view,
-                    self._hover_diagnostic_message,
-                    self.hover_point,
-                    "markdown",
-                )
+            diagnostic_message = self._get_diagnostic_message(document, row, col)
         except Exception:
-            pass
+            return
+
+        hover_point = getattr(self, "hover_point", -1)
+        if diagnostic_message:
+            # show diagnostics immediately (markdown)
+            self.show_hover_popup(
+                document.view,
+                diagnostic_message,
+                hover_point,
+                "markdown",
+            )
+            self.hovered_diagnostic_message = diagnostic_message
 
     @staticmethod
     def _get_diagnostic_message(document: Document, row: int, col: int) -> str:

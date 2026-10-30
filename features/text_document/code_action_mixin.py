@@ -13,7 +13,7 @@ from ...registry import COMMAND_PREFIX
 
 class DocumentCodeActionMixin(BaseClient):
 
-    document_code_action_target: Optional[Document] = None
+    document_code_action_target: Optional[Document]
 
     def set_client_capabilities(self):
         self.session.client_capabilities["textDocument"].update(
@@ -128,6 +128,6 @@ class DocumentCodeActionMixin(BaseClient):
     def handle_code_action_resolve_result(
         self, context: dict, result: CodeAction
     ) -> None:
-        if not result:
+        if not (result and self.document_code_action_target):
             return
         self._handle_code_action(self.session, result)

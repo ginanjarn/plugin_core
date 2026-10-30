@@ -51,6 +51,29 @@ LSP_TO_SUBLIME_KIND_MAP = defaultdict(
 )
 
 
+class CompletionBuffer:
+    def __init__(self) -> None:
+        self._items = []
+        self._lock = Lock()
+
+    def is_available(self) -> bool:
+        with self._lock:
+            return self._items is not EMPTY
+
+    def set(self, items: List[sublime.CompletionItem]) -> None:
+        with self._lock:
+            self._items = items
+
+    def pop(self) -> List[sublime.CompletionItem]:
+        with self._lock:
+            completions = self._items
+            if completions is EMPTY:
+                return []
+
+            self._items = EMPTY
+            return completions
+
+
 class DocumentCompletionMixin(BaseClient):
     """Handles completion requests and caching."""
 
@@ -60,9 +83,8 @@ class DocumentCompletionMixin(BaseClient):
         "auto_complete_commit_on_tab": True,
     }
 
-    document_completion_target: Optional[Document] = None
-    _cached_completions: Union[List[sublime.CompletionItem], _Empty] = EMPTY
-    _cached_completions_lock = Lock()
+    document_completion_target: Optional[Document]
+    _completion_buffer: CompletionBuffer
 
     def set_client_capabilities(self):
         self.session.client_capabilities["textDocument"].update(
@@ -117,19 +139,17 @@ class DocumentCompletionMixin(BaseClient):
             }
         )
 
-    def completion_result_available(self) -> bool:
-        with self._cached_completions_lock:
-            return self._cached_completions is not EMPTY
+    @property
+    def completion_buffer(self) -> CompletionBuffer:
+        if not getattr(self, "_completion_buffer", None):
+            self._completion_buffer = CompletionBuffer()
+        return self._completion_buffer
 
-    def set_completions(self, completions: List[sublime.CompletionItem]) -> None:
-        with self._cached_completions_lock:
-            self._cached_completions = completions
+    def completion_result_available(self) -> bool:
+        return self.completion_buffer.is_available()
 
     def pop_completions(self) -> List[sublime.CompletionItem]:
-        with self._cached_completions_lock:
-            completions = self._cached_completions
-            self._cached_completions = EMPTY
-            return completions if completions is not EMPTY else []
+        return self.completion_buffer.pop()
 
     @on_new_thread
     @require_server_capability("completionProvider")
@@ -166,7 +186,7 @@ class DocumentCompletionMixin(BaseClient):
             print(f"[LSP Completion] Error building completions: {e}")
             return
 
-        self.set_completions(items)
+        self.completion_buffer.set(items)
         self.document_completion_target.view.run_command(
             "auto_complete", self._auto_complete_args
         )

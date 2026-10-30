@@ -16,7 +16,7 @@ LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 class DocumentRenameMixin(BaseClient):
     """Handle LSP prepareRename and rename requests with safer defaults and UX."""
 
-    document_rename_target: Optional[Document] = None
+    document_rename_target: Optional[Document]
 
     def set_client_capabilities(self):
         self.session.client_capabilities["textDocument"].update(
@@ -55,7 +55,7 @@ class DocumentRenameMixin(BaseClient):
     ) -> None:
         """Validate prepareRename result and prompt user for new name."""
 
-        if not result or not self.document_rename_target:
+        if not (result and self.document_rename_target):
             sublime.status_message("LSP: Cannot rename here")
             return
 
@@ -148,7 +148,7 @@ class DocumentRenameMixin(BaseClient):
         self, context: Dict[str, Any], result: Union[LspWorkspaceEdit, None]
     ) -> None:
         """Apply workspace edit returned by the server and reset state."""
-        if not result:
+        if not (result and self.document_rename_target):
             sublime.status_message("LSP: No changes from rename")
             return
 

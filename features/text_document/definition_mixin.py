@@ -16,7 +16,7 @@ LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 class DocumentDefinitionMixin(BaseClient):
     """Handles LSP definition requests and results."""
 
-    document_definition_target: Optional[Document] = None
+    document_definition_target: Optional[Document]
 
     def set_client_capabilities(self):
         self.session.client_capabilities["textDocument"].update(
