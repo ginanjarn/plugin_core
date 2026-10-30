@@ -16,7 +16,7 @@ from .features.server_manager import (
     _TerminateServerCommandMixin,
 )
 from .features.initializer import _InitializeCommandMixin
-from .features.text_document.synchronization import (
+from .features.synchronization import (
     DocumentSynchronizeEventMixin,
     DocumentChangeEventMixin,
 )

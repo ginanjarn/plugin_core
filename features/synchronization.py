@@ -2,7 +2,7 @@ from typing import List
 
 import sublime
 
-from ...document import TextChange
+from ..document import TextChange
 from .synchronization_mixin import DocumentSynchronizerMixin
 
 

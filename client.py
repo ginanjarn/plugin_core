@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .client_internal import BaseClient
 from .features.initializer_mixin import InitializerMixin
-from .features.text_document.synchronization_mixin import DocumentSynchronizerMixin
+from .features.synchronization_mixin import DocumentSynchronizerMixin
 from .features.text_document.completion_mixin import DocumentCompletionMixin
 from .features.text_document.signature_help_mixin import DocumentSignatureHelpMixin
 from .features.text_document.hover_mixin import DocumentHoverMixin
