@@ -14,7 +14,7 @@ class DocumentCompletionEventMixin:
         super().__init__(*args, **kwargs)
         self.completion_trigger_point = 0
 
-    def on_query_completions(
+    def document_completion(
         self, prefix: str, locations: List[int]
     ) -> Optional[sublime.CompletionList]:
         location = min(locations)

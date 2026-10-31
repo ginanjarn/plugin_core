@@ -8,7 +8,7 @@ class _StartServerCommandMixin:
 
     _run_lock = threading.Lock()
 
-    def run(self, edit: sublime.Edit, process_args: dict):
+    def start_server(self, edit: sublime.Edit, process_args: dict):
         thread = threading.Thread(target=self.run_task, args=(process_args,))
         thread.start()
 
@@ -32,5 +32,5 @@ class _StartServerCommandMixin:
 
 class _TerminateServerCommandMixin:
 
-    def run(self, edit: sublime.Edit):
+    def terminate_server(self, edit: sublime.Edit):
         self.client.disconnect()

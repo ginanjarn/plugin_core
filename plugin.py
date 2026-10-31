@@ -90,20 +90,6 @@ class _BaseTextCommand(
     _WorkspaceExecuteCommandCommandMixin,
     BasePlugin,
 ):
-    action_map = {
-        "apply_text_change": _ApplyTextChangesCommandMixin,
-        "start_server": _StartServerCommandMixin,
-        "terminate_server": _TerminateServerCommandMixin,
-        "initialize": _InitializeCommandMixin,
-        "document_code_action": _DocumentCodeActionCommandMixin,
-        "document_signature_help": _DocumentSignatureHelpCommandMixin,
-        "document_formatting": _DocumentFormattingCommandMixin,
-        "document_definition": _DocumentDefinitionCommandMixin,
-        "document_prepare_rename": _DocumentPrepareRenameCommandMixin,
-        "document_rename": _DocumentRenameCommandMixin,
-        "document_symbol": _DocumentSymbolCommandMixin,
-        "workspace_execute_command": _WorkspaceExecuteCommandCommandMixin,
-    }
 
     non_initialized_actions = frozenset(
         {"start_server", "terminate_server", "initialize"}
@@ -112,10 +98,24 @@ class _BaseTextCommand(
     def run(
         self, edit: sublime.Edit, action: str, event: Optional[dict] = None, **kwargs
     ):
+        action_map = {
+            "apply_text_change": self.apply_text_change,
+            "start_server": self.start_server,
+            "terminate_server": self.terminate_server,
+            "initialize": self.initialize,
+            "document_code_action": self.document_code_action,
+            "document_signature_help": self.document_signature_help,
+            "document_formatting": self.document_formatting,
+            "document_definition": self.document_definition,
+            "document_prepare_rename": self.document_prepare_rename,
+            "document_rename": self.document_rename,
+            "document_symbol": self.document_symbol,
+            "workspace_execute_command": self.workspace_execute_command,
+        }
         try:
-            runner = self.action_map[action]
+            runner = action_map[action]
         except KeyError:
-            print("expected actions:", list(self.action_map.keys()))
+            print("expected actions:", list(action_map.keys()))
             return
 
         if event:
@@ -129,7 +129,7 @@ class _BaseTextCommand(
                 return
 
         try:
-            runner.run(self, edit, **kwargs)
+            runner(edit, **kwargs)
         except Exception as err:
             LOGGER.exception("command error: %s", err, exc_info=True)
 
@@ -158,56 +158,49 @@ class EventListener(
     @client_must_ready
     @must_valid_document
     def on_activated_async(self) -> None:
-        DocumentSynchronizeEventMixin.on_activated_async(self)
+        self.document_didopen()
 
     @client_must_ready
     @must_valid_document
     def on_load_async(self) -> None:
-        DocumentSynchronizeEventMixin.on_load_async(self)
+        self.document_didopen_reload()
 
     @client_must_ready
     @must_valid_document
     def on_reload_async(self) -> None:
-        DocumentSynchronizeEventMixin.on_reload_async(self)
+        self.document_didopen_reload()
 
     @client_must_ready
     @must_valid_document
     def on_revert_async(self) -> None:
-        DocumentSynchronizeEventMixin.on_revert_async(self)
+        self.document_didopen_reload()
 
     @client_must_ready
     @must_valid_document
     def on_post_save_async(self) -> None:
-        DocumentSynchronizeEventMixin.on_post_save_async(self)
+        self.document_didsave()
 
     @client_must_ready
     @must_valid_document
     def on_close(self) -> None:
-        DocumentSynchronizeEventMixin.on_close(self)
+        self.document_didclose()
 
     @client_must_ready
     @must_valid_document
     def on_query_completions(
         self, prefix: str, locations: List[Point]
     ) -> Optional[sublime.CompletionList]:
-        return DocumentCompletionEventMixin.on_query_completions(
-            self, prefix, locations
-        )
-
-    @client_must_ready
-    @must_valid_document
-    def on_modified_async(self) -> None:
-        DocumentSignatureHelpEventMixin.on_modified_async(self)
-
-    @client_must_ready
-    @must_valid_document
-    def on_selection_modified_async(self) -> None:
-        DocumentSignatureHelpEventMixin.on_selection_modified_async(self)
+        return self.document_completion(prefix, locations)
 
     @client_must_ready
     @must_valid_document
     def on_hover(self, point: Point, hover_zone: HoverZone):
-        DocumentHoverEventMixin.on_hover(self, point, hover_zone)
+        self.document_hover(point, hover_zone)
+
+    @client_must_ready
+    @must_valid_document
+    def on_modified_async(self) -> None:
+        self.document_signature_help()
 
 
 class TextChangeListener(
@@ -221,4 +214,4 @@ class TextChangeListener(
     def on_text_changed(self, changes: List[sublime.TextChange]):
         if not is_valid_document(self.buffer.primary_view()):
             return
-        DocumentChangeEventMixin.on_text_changed(self, changes)
+        self.document_didchange(changes)

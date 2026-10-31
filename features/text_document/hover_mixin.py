@@ -150,34 +150,23 @@ class DocumentHoverMixin(BaseClient):
         Show popup using the project's marked_popup command.
         - markup: "markdown" or "plain"
         """
-        # Ensure text is not None
-        if text is None:
-            return
-        view.run_command(
-            "marked_popup",
-            {
-                "location": location,
-                "text": text,
-                "markup": markup,
-            },
-        )
+        if text:
+            view.run_command(
+                "marked_popup",
+                {"location": location, "text": text, "markup": markup},
+            )
 
     def _show_hovered_diagnostic_message(self, document: Document, row: int, col: int):
         try:
-            diagnostic_message = self._get_diagnostic_message(document, row, col)
+            message = self._get_diagnostic_message(document, row, col)
+            self.hovered_diagnostic_message = message
         except Exception:
             return
 
         hover_point = getattr(self, "hover_point", -1)
-        if diagnostic_message:
+        if message:
             # show diagnostics immediately (markdown)
-            self.show_hover_popup(
-                document.view,
-                diagnostic_message,
-                hover_point,
-                "markdown",
-            )
-            self.hovered_diagnostic_message = diagnostic_message
+            self.show_hover_popup(document.view, message, hover_point, "markdown")
 
     @staticmethod
     def _get_diagnostic_message(document: Document, row: int, col: int) -> str:

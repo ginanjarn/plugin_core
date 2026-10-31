@@ -8,5 +8,5 @@ class _DocumentFormattingCommandMixin:
 
     client: DocumentFormattingMixin
 
-    def run(self, edit: sublime.Edit) -> None:
+    def document_formatting(self, edit: sublime.Edit) -> None:
         self.client.textdocument_formatting(self.view)

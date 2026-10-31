@@ -10,5 +10,7 @@ class _WorkspaceExecuteCommandCommandMixin:
 
     client: WorkspaceExecuteCommandMixin
 
-    def run(self, edit: sublime.Edit, command: Dict[str, Any]) -> None:
+    def workspace_execute_command(
+        self, edit: sublime.Edit, command: Dict[str, Any]
+    ) -> None:
         self.client.workspace_executecommand(command)

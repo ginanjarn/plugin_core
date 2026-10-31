@@ -6,7 +6,7 @@ from .hover_mixin import DocumentHoverMixin
 class DocumentHoverEventMixin:
     client: DocumentHoverMixin
 
-    def on_hover(self, point: int, hover_zone: sublime.HoverZone) -> None:
+    def document_hover(self, point: int, hover_zone: sublime.HoverZone) -> None:
         if hover_zone != sublime.HoverZone.TEXT:
             return
 

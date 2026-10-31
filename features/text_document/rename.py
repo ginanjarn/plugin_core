@@ -6,14 +6,14 @@ from .rename_mixin import DocumentRenameMixin
 class _DocumentPrepareRenameCommandMixin:
     client: DocumentRenameMixin
 
-    def run(self, edit: sublime.Edit) -> None:
-        point = self.view.sel()[0].begin()
-        row, column = self.view.rowcol(point)
-        self.client.textdocument_preparerename(self.view, row, column)
+    def document_prepare_rename(self, edit: sublime.Edit) -> None:
+        self.client.textdocument_preparerename(self.view)
 
 
 class _DocumentRenameCommandMixin:
     client: DocumentRenameMixin
 
-    def run(self, edit: sublime.Edit, row: int, column: int, new_name: str) -> None:
+    def document_rename(
+        self, edit: sublime.Edit, row: int, column: int, new_name: str
+    ) -> None:
         self.client.textdocument_rename(self.view, row, column, new_name)

@@ -7,5 +7,5 @@ class _InitializeCommandMixin:
 
     client: InitializerMixin
 
-    def run(self, edit: sublime.Edit):
+    def initialize(self, edit: sublime.Edit):
         self.client.initialize(self.view)

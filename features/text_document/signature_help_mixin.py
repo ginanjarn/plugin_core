@@ -42,9 +42,7 @@ class DocumentSignatureHelpMixin(BaseClient):
 
     @on_new_thread
     @require_server_capability("signatureHelpProvider")
-    def textdocument_signaturehelp(
-        self, view: sublime.View, row: int, col: int
-    ) -> None:
+    def textdocument_signaturehelp(self, view: sublime.View) -> None:
         """Send signatureHelp request to the server with debounce and stale-response protection."""
 
         document = self.session.get_document(view)
@@ -63,6 +61,7 @@ class DocumentSignatureHelpMixin(BaseClient):
             prev_target.view.hide_popup()
 
         self.document_signature_help_target = document
+        row, col = view.rowcol(view.sel()[0].begin())
         self.signature_help_point = view.text_point(row, col)
         self.signature_help_request(
             {

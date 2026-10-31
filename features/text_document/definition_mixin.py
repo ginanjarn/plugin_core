@@ -25,11 +25,12 @@ class DocumentDefinitionMixin(BaseClient):
 
     @on_new_thread
     @require_server_capability("definitionProvider")
-    def textdocument_definition(self, view: sublime.View, row: int, col: int) -> None:
+    def textdocument_definition(self, view: sublime.View) -> None:
 
         document = self.session.get_document(view)
         if document:
             self.document_definition_target = document
+            row, col = view.rowcol(view.sel()[0].begin())
             self.definition_request(
                 {
                     "position": {"character": col, "line": row},

@@ -32,9 +32,7 @@ class DocumentRenameMixin(BaseClient):
 
     @on_new_thread
     @require_server_capability("renameProvider")
-    def textdocument_preparerename(
-        self, view: sublime.View, row: int, col: int
-    ) -> None:
+    def textdocument_preparerename(self, view: sublime.View) -> None:
         """Ask server whether rename is allowed at the given position."""
 
         document = self.session.get_document(view)
@@ -42,6 +40,7 @@ class DocumentRenameMixin(BaseClient):
             return
 
         self.document_rename_target = document
+        row, col = view.rowcol(view.sel()[0].begin())
         self.prepare_rename_request(
             {
                 "position": {"character": col, "line": row},

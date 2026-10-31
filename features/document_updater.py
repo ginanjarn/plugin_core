@@ -23,7 +23,7 @@ class _ApplyTextChangesCommandMixin:
       view.run_command("_apply_text_changes", {"changes": [...], "dry_run": False})
     """
 
-    def run(
+    def apply_text_change(
         self, edit: sublime.Edit, changes: List[Dict[str, Any]], dry_run: bool = False
     ) -> None:
         try:
