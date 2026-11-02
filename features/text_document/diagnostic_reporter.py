@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Set, Callable
+from typing import Callable, Dict, List, Set
 
 import sublime
 from sublime import View
 
-from ...document import TextChange
-from ...registry import PACKAGE_NAME, COMMAND_PREFIX, SETTINGS_BASENAME
+from ...registry import PACKAGE_NAME, SETTINGS_BASENAME
+from .panels import OutputPanel
 
 
 @dataclass
@@ -179,7 +179,7 @@ class ReportPanel(AbstractReporter):
 
     def show(self, view: View, diagnostics: List[Diagnostic]):
         content = "\n".join([self.build_line(view, d) for d in diagnostics])
-        self._panel.set_content(content)
+        self._panel.set_text(content)
         self._panel.show()
 
     def build_line(self, view: View, item: Diagnostic):
@@ -189,45 +189,3 @@ class ReportPanel(AbstractReporter):
 
     def clear(self):
         self._panel.destroy()
-
-
-class OutputPanel:
-    SETTINGS = {"gutter": False, "word_wrap": False}
-
-    def __init__(self, panel_name: str):
-        self.panel_name = panel_name
-        self.panel: View = None
-
-    def _create_panel(self):
-        self.panel = sublime.active_window().create_output_panel(self.panel_name)
-        self.panel.settings().update(self.SETTINGS)
-        self.panel.set_read_only(False)
-
-    def set_content(self, text: str):
-        if not (self.panel and self.panel.is_valid()):
-            self._create_panel()
-
-        # clear selection in output panel
-        self.panel.sel().clear()
-        start = (0, 0)
-        end = self.panel.rowcol(self.panel.size())
-
-        change = TextChange(start, end, text, None)
-        self.panel.run_command(
-            f"{COMMAND_PREFIX}_apply_text_changes",
-            {"changes": [asdict(change)]},
-        )
-
-    def show(self) -> None:
-        """show output panel"""
-        if not self.panel:
-            return
-        self.panel.window().run_command(
-            "show_panel", {"panel": f"output.{self.panel_name}"}
-        )
-
-    def destroy(self):
-        """destroy output panel"""
-        if not self.panel:
-            return
-        self.panel.window().destroy_output_panel(self.panel_name)
