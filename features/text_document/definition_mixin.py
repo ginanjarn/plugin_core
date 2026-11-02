@@ -30,7 +30,7 @@ class DocumentDefinitionMixin(BaseClient):
         document = self.session.get_document(view)
         if document:
             self.document_definition_target = document
-            row, col = view.rowcol(view.sel()[0].begin())
+            row, col = view.rowcol(view.sel()[0].end())
             self.definition_request(
                 {
                     "position": {"character": col, "line": row},

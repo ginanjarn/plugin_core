@@ -121,8 +121,10 @@ class _BaseTextCommand(
         if event:
             view_sel = self.view.sel
             if text_point := event.get("text_point"):
-                view_sel().clear()
-                view_sel().add(sublime.Region(text_point))
+                # move selection if text_point not in first selection
+                if not view_sel()[0].contains(text_point):
+                    view_sel().clear()
+                    view_sel().add(sublime.Region(text_point))
 
         if action not in self.non_initialized_actions:
             if not self.client.is_ready():

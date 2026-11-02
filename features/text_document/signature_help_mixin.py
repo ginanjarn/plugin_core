@@ -61,7 +61,7 @@ class DocumentSignatureHelpMixin(BaseClient):
             prev_target.view.hide_popup()
 
         self.document_signature_help_target = document
-        row, col = view.rowcol(view.sel()[0].begin())
+        row, col = view.rowcol(view.sel()[0].end())
         self.signature_help_point = view.text_point(row, col)
         self.signature_help_request(
             {

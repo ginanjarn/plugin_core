@@ -40,7 +40,7 @@ class DocumentRenameMixin(BaseClient):
             return
 
         self.document_rename_target = document
-        row, col = view.rowcol(view.sel()[0].begin())
+        row, col = view.rowcol(view.sel()[0].end())
         self.prepare_rename_request(
             {
                 "position": {"character": col, "line": row},
