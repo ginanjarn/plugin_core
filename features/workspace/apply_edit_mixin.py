@@ -1,10 +1,10 @@
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
-from ..workspace_updater import apply_workspace_edit
-from ...client_internal import BaseClient
+from ...base_client import BaseClient
 from ...lsprotocol.client import ApplyWorkspaceEditParams, ApplyWorkspaceEditResult
 from ...utils import on_main_thread
+from ..workspace_updater import apply_workspace_edit
 
 LOGGER = logging.getLogger(__name__)
 

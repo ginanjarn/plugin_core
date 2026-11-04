@@ -1,23 +1,23 @@
 from collections import namedtuple
 from dataclasses import asdict
 from pathlib import Path
-from typing import List, Dict, Union
+from typing import Dict, List, Union
 
 import sublime
 
 from ..document import TextChange
-from ..session import Session
-from ..uri import uri_to_path
 from ..lsprotocol.lsprotocol import (
-    WorkspaceEdit,
-    TextEdit,
-    DocumentUri,
-    TextDocumentEdit,
     CreateFile,
-    RenameFile,
     DeleteFile,
+    DocumentUri,
+    RenameFile,
+    TextDocumentEdit,
+    TextEdit,
+    WorkspaceEdit,
 )
 from ..registry import COMMAND_PREFIX
+from ..session import Session
+from ..uri import uri_to_path
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 PathStr = str

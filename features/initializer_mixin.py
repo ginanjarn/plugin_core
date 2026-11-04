@@ -6,10 +6,10 @@ from uuid import uuid4
 
 import sublime
 
-from ..client_internal import BaseClient
+from ..base_client import BaseClient
+from ..lsprotocol.client import InitializeResult
 from ..session import SessionStatus, Workspace
 from ..uri import path_to_uri
-from ..lsprotocol.client import InitializeResult
 
 
 class InitializerMixin(BaseClient):

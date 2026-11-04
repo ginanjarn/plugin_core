@@ -2,13 +2,13 @@ from typing import List, Optional, Union
 
 import sublime
 
-from ..workspace_updater import apply_workspace_edit
-from ...client_internal import BaseClient, require_server_capability
+from ...base_client import BaseClient, require_server_capability
 from ...document import Document
+from ...lsprotocol.client import CodeAction, Command
+from ...registry import COMMAND_PREFIX
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
-from ...lsprotocol.client import Command, CodeAction
-from ...registry import COMMAND_PREFIX
+from ..workspace_updater import apply_workspace_edit
 
 
 class DocumentCodeActionMixin(BaseClient):

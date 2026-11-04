@@ -1,14 +1,15 @@
 from collections import namedtuple
-from typing import Optional, Union, Dict, Any
+from typing import Any, Dict, Optional, Union
 
 import sublime
 
-from ..workspace_updater import apply_workspace_edit
-from ...client_internal import BaseClient, require_server_capability
+from ...base_client import BaseClient, require_server_capability
 from ...document import Document
+from ...lsprotocol.client import PrepareRenameResult
+from ...lsprotocol.client import WorkspaceEdit as LspWorkspaceEdit
 from ...uri import path_to_uri
-from ...lsprotocol.client import PrepareRenameResult, WorkspaceEdit as LspWorkspaceEdit
 from ...utils import on_main_thread, on_new_thread
+from ..workspace_updater import apply_workspace_edit
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 

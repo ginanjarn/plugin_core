@@ -1,12 +1,13 @@
 from collections import namedtuple
+
 import sublime
 from sublime import View
 
-from .diagnostic_reporter import Diagnostic
-from ...client_internal import BaseClient
-from ...uri import uri_to_path
+from ...base_client import BaseClient
 from ...lsprotocol.client import PublishDiagnosticsParams
+from ...uri import uri_to_path
 from ...utils import on_main_thread
+from .diagnostic_reporter import Diagnostic
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 

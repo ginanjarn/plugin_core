@@ -1,7 +1,7 @@
 import logging
 from typing import Union
 
-from ...client_internal import BaseClient
+from ...base_client import BaseClient
 from ...lsprotocol.client import LSPAny
 from ...utils import on_main_thread, on_new_thread
 

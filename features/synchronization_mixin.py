@@ -2,10 +2,10 @@ from typing import List
 
 import sublime
 
-from ..client_internal import BaseClient, require_server_capability
+from ..base_client import BaseClient, require_server_capability
 from ..document import Document, TextChange
-from ..uri import path_to_uri
 from ..lsprotocol.lsprotocol import TextDocumentContentChangePartial
+from ..uri import path_to_uri
 
 # Threshold in bytes to avoid sending full document text blindly
 FULL_TEXT_SIZE_THRESHOLD = 200_000

@@ -1,14 +1,14 @@
 from collections import namedtuple
 from html import escape as escape_html
-from typing import Union, Optional, List
+from typing import List, Optional, Union
 
 import sublime
 
-from ...client_internal import BaseClient, require_server_capability
+from ...base_client import BaseClient, require_server_capability
 from ...document import Document
+from ...lsprotocol.client import Hover
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
-from ...lsprotocol.client import Hover
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 

@@ -1,13 +1,13 @@
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
 import sublime
 
-from ..workspace_updater import apply_text_edits
-from ...client_internal import BaseClient, require_server_capability
+from ...base_client import BaseClient, require_server_capability
 from ...document import Document
+from ...lsprotocol.client import TextEdit
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
-from ...lsprotocol.client import TextEdit
+from ..workspace_updater import apply_text_edits
 
 
 class DocumentFormattingMixin(BaseClient):

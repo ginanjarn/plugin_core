@@ -1,14 +1,14 @@
 import time
 from collections import namedtuple
-from typing import Optional, Union, List, Dict, Any
+from typing import Any, Dict, List, Optional, Union
 
 import sublime
 
-from ...client_internal import BaseClient, require_server_capability
+from ...base_client import BaseClient, require_server_capability
 from ...document import Document
+from ...lsprotocol.client import SignatureHelp
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
-from ...lsprotocol.client import SignatureHelp
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 

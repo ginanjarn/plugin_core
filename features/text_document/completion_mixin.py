@@ -1,15 +1,15 @@
 from collections import defaultdict
 from threading import Lock
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
 import sublime
 from sublime import KindId
 
-from ...client_internal import BaseClient, require_server_capability
+from ...base_client import BaseClient, require_server_capability
 from ...document import Document
+from ...lsprotocol.client import CompletionItem, CompletionList
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
-from ...lsprotocol.client import CompletionList, CompletionItem
 
 
 class _Empty:

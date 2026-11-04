@@ -1,13 +1,13 @@
 from collections import namedtuple
-from typing import Optional, List, Union
+from typing import List, Optional, Union
 
 import sublime
 
-from ...client_internal import BaseClient, require_server_capability
+from ...base_client import BaseClient, require_server_capability
 from ...document import Document
+from ...lsprotocol.client import Definition, DefinitionLink, Location
 from ...uri import path_to_uri, uri_to_path
 from ...utils import on_main_thread, on_new_thread
-from ...lsprotocol.client import Definition, Location, DefinitionLink
 
 PathEncodedStr = str
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])

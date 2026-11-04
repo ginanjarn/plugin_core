@@ -8,33 +8,33 @@ import sublime
 import sublime_plugin
 from sublime import HoverZone
 
-from .client_internal import BaseClient
-from .registry import VIEW_SELECTOR
+from .base_client import BaseClient
 from .features.document_updater import _ApplyTextChangesCommandMixin
+from .features.initializer import _InitializeCommandMixin
 from .features.server_manager import (
     _StartServerCommandMixin,
     _TerminateServerCommandMixin,
 )
-from .features.initializer import _InitializeCommandMixin
 from .features.synchronization import (
-    DocumentSynchronizeEventMixin,
     DocumentChangeEventMixin,
+    DocumentSynchronizeEventMixin,
 )
 from .features.text_document.code_action import _DocumentCodeActionCommandMixin
 from .features.text_document.completion import DocumentCompletionEventMixin
-from .features.text_document.signature_help import (
-    _DocumentSignatureHelpCommandMixin,
-    DocumentSignatureHelpEventMixin,
-)
-from .features.text_document.hover import DocumentHoverEventMixin
-from .features.text_document.formatting import _DocumentFormattingCommandMixin
 from .features.text_document.definition import _DocumentDefinitionCommandMixin
+from .features.text_document.formatting import _DocumentFormattingCommandMixin
+from .features.text_document.hover import DocumentHoverEventMixin
 from .features.text_document.rename import (
     _DocumentPrepareRenameCommandMixin,
     _DocumentRenameCommandMixin,
 )
+from .features.text_document.signature_help import (
+    DocumentSignatureHelpEventMixin,
+    _DocumentSignatureHelpCommandMixin,
+)
 from .features.text_document.symbol import _DocumentSymbolCommandMixin
 from .features.workspace.execute_command import _WorkspaceExecuteCommandCommandMixin
+from .registry import VIEW_SELECTOR
 
 LOGGER = logging.getLogger(__name__)
 Point = int

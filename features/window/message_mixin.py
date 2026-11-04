@@ -1,9 +1,10 @@
-import sublime
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
-from ...client_internal import BaseClient
-from ...utils import on_main_thread
+import sublime
+
+from ...base_client import BaseClient
 from ...lsprotocol.client import LogMessageParams, ShowMessageParams
+from ...utils import on_main_thread
 
 # LSP MessageType: 1 = Error, 2 = Warning, 3 = Info, 4 = Log
 _MESSAGE_TYPE_NAME = {
