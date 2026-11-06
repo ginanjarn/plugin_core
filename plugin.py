@@ -56,9 +56,10 @@ def client_must_ready(func):
     return wrapper
 
 
-def is_valid_document(view: sublime.View) -> bool:
+def is_valid_document(view: sublime.View, selector: str = None) -> bool:
     """check if view is valid document"""
-    return bool(view.file_name()) and view.match_selector(0, VIEW_SELECTOR)
+    selector = selector or VIEW_SELECTOR
+    return bool(view.file_name()) and view.match_selector(0, selector)
 
 
 def must_valid_document(func):
@@ -66,7 +67,7 @@ def must_valid_document(func):
 
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        if is_valid_document(self.view):
+        if is_valid_document(self.view, None):
             return func(self, *args, **kwargs)
         return None
 
@@ -143,7 +144,7 @@ class _BaseTextCommand(
             view_sel().add(text_point)
 
     def is_visible(self, action: str = "") -> bool:
-        if self.client and is_valid_document(self.view):
+        if self.client and is_valid_document(self.view, None):
             if self.client.is_ready():
                 return True
             return action in self.non_initialized_actions
@@ -221,6 +222,6 @@ class TextChangeListener(
 
     @client_must_ready
     def on_text_changed(self, changes: List[sublime.TextChange]):
-        if not is_valid_document(self.buffer.primary_view()):
+        if not is_valid_document(self.buffer.primary_view(), None):
             return
         self.document_didchange(changes)
