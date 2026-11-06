@@ -118,22 +118,29 @@ class _BaseTextCommand(
             print("expected actions:", list(action_map.keys()))
             return
 
-        if event:
-            view_sel = self.view.sel
-            if text_point := event.get("text_point"):
-                # move selection if text_point not in first selection
-                if not view_sel()[0].contains(text_point):
-                    view_sel().clear()
-                    view_sel().add(sublime.Region(text_point))
-
         if action not in self.non_initialized_actions:
             if not self.client.is_ready():
                 return
 
+        self.move_selection(event)
         try:
             runner(edit, **kwargs)
         except Exception as err:
             LOGGER.exception("command error: %s", err, exc_info=True)
+
+    def move_selection(self, event: dict) -> None:
+        if not event:
+            return
+        text_point = event.get("text_point")
+        if text_point is None:
+            return
+
+        view_sel = self.view.sel
+        # move selection if text_point not in first selection
+        selection = view_sel()[0]
+        if not selection.contains(text_point):
+            view_sel().clear()
+            view_sel().add(text_point)
 
     def is_visible(self, action: str = "") -> bool:
         if self.client and is_valid_document(self.view):
