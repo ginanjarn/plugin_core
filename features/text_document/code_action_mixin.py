@@ -5,7 +5,7 @@ import sublime
 from ...base_client import BaseClient, require_server_capability
 from ...document import Document
 from ...lsprotocol.client import CodeAction, Command
-from ...registry import COMMAND_PREFIX
+from ...registry import COMMAND_NAME
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
 from ..workspace_updater import apply_workspace_edit
@@ -116,7 +116,7 @@ class DocumentCodeActionMixin(BaseClient):
                 command = action
             view = self.document_code_action_target.view
             view.run_command(
-                COMMAND_PREFIX,
+                COMMAND_NAME,
                 {"action": "workspace_execute_command", "command": command},
             )
         else:

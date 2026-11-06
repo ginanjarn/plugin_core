@@ -15,7 +15,7 @@ from ..lsprotocol.lsprotocol import (
     TextEdit,
     WorkspaceEdit,
 )
-from ..registry import COMMAND_PREFIX
+from ..registry import COMMAND_NAME
 from ..session import Session
 from ..uri import uri_to_path
 
@@ -76,7 +76,7 @@ class WorkspaceUpdater:
     @staticmethod
     def _apply_view_changes(view: sublime.View, text_changes: List[TextChange]):
         view.run_command(
-            COMMAND_PREFIX,
+            COMMAND_NAME,
             {
                 "action": "apply_text_change",
                 "changes": [asdict(c) for c in text_changes],

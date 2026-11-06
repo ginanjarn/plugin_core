@@ -29,6 +29,6 @@ REGISTRY.update(
 # Reserved settings
 PACKAGE_NAME = REGISTRY["package_name"]
 LOGGING_CHANNEL = REGISTRY["logging_channel"]
-COMMAND_PREFIX = REGISTRY["command_prefix"]
+COMMAND_NAME = REGISTRY["command_prefix"]
 SETTINGS_BASENAME = REGISTRY["settings_basename"]
 VIEW_SELECTOR = REGISTRY["view_selector"]
