@@ -56,7 +56,7 @@ class Session:
         self.opened_documents = DocumentMap()
 
         # Diagnostic manager
-        self.diagnostic_reporter = DiagnosticReportManager()
+        self.diagnostic_reporter: DiagnosticReportManager = None
 
     def get_document(
         self, view: View, /, default: Optional[Any] = None
@@ -98,5 +98,5 @@ class Session:
     def reset(self):
         """"""
         self.opened_documents.clear()
-        self.diagnostic_reporter.reset()
+        self.diagnostic_reporter = None
         self.status = SessionStatus.NotSet

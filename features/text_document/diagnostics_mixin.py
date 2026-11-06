@@ -5,11 +5,21 @@ from sublime import View
 
 from ...base_client import BaseClient
 from ...lsprotocol.client import PublishDiagnosticsParams
+from ...registry import PACKAGE_NAME, SETTINGS_BASENAME
 from ...uri import uri_to_path
 from ...utils import on_main_thread
-from .diagnostic_reporter import Diagnostic
+from .diagnostic_reporter import Diagnostic, ReportManager, Settings
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
+
+
+def load_settings(basename: str) -> Settings:
+    settings = sublime.load_settings(basename)
+    return Settings(
+        bool(settings.get("highlight_text")),
+        bool(settings.get("status_message")),
+        bool(settings.get("report_panel")),
+    )
 
 
 class DocumentDiagnosticsMixin(BaseClient):
@@ -42,6 +52,10 @@ class DocumentDiagnosticsMixin(BaseClient):
     ) -> None:
         file_name = uri_to_path(params["uri"])
         diagnostics = params.get("diagnostics", [])
+
+        if not self.session.diagnostic_reporter:
+            settings = load_settings(SETTINGS_BASENAME)
+            self.session.diagnostic_reporter = ReportManager(PACKAGE_NAME, settings)
 
         documents = self.session.get_documents(lambda doc: doc.file_name == file_name)
         for document in documents:

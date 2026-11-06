@@ -7,7 +7,6 @@ from typing import Callable, Dict, List, Set
 import sublime
 from sublime import View
 
-from ...registry import PACKAGE_NAME, SETTINGS_BASENAME
 from .panels import OutputPanel
 
 
@@ -26,42 +25,30 @@ class Settings:
     status_message: bool = True
     report_panel: bool = False
 
-    @classmethod
-    def from_user_settings(cls, settings: sublime.Settings):
-        ht = settings.get("highlight_text", True)
-        sm = settings.get("status_message", True)
-        panel = settings.get("report_panel", False)
-        return cls(ht, sm, panel)
-
 
 class ReportManager:
     """"""
 
     PUBLISH_KEY = "publish_diagnostic"
     CLEAR_KEY = "clear_diagnostic"
-    SETTINGS_CHANGE_TAG = "diagnostic_report_setting"
 
-    def __init__(self) -> None:
+    def __init__(self, manager_id: str, settings: Settings) -> None:
         self._diagnostics_map: Dict[View, List[Diagnostic]] = defaultdict(list)
         self._active_view: View = None
 
         # reporter publisher
         self.report_publisher = Publisher()
 
-        key = f"{PACKAGE_NAME}_DIAGNOSTIC"
+        key = f"{manager_id}_DIAGNOSTIC"
         self.highlight_text = HighlightText(key)
         self.status_message = StatusMessage(key)
-        self.report_panel = ReportPanel(PACKAGE_NAME)
+        self.report_panel = ReportPanel(manager_id)
 
-        user_settings = sublime.load_settings(SETTINGS_BASENAME)
-        user_settings.add_on_change(self.SETTINGS_CHANGE_TAG, self.update_reporter)
-        self.update_reporter(user_settings)
+        self.update_reporter(settings)
 
-    def update_reporter(self, user_settings: sublime.Settings):
+    def update_reporter(self, settings: Settings):
         # clear existing report
         self.report_publisher.publish(self.CLEAR_KEY)
-
-        settings = Settings.from_user_settings(user_settings)
 
         reporters = []
         if settings.highlight_text:

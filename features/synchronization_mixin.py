@@ -37,7 +37,10 @@ class DocumentSynchronizerMixin(BaseClient):
                 return
 
             # Ensure diagnostic UI is visible for this view
-            self.session.diagnostic_reporter.show(view)
+            try:
+                self.session.diagnostic_reporter.show(view)
+            except AttributeError:
+                pass
 
             # If document already tracked and reload not requested, do nothing
             existing = self.session.get_document(view)
