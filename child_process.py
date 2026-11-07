@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from functools import wraps
 from io import BytesIO
 from pathlib import Path
-from typing import List, Tuple, Optional, Union, Callable, Any
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 LOGGER = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ def recover_exception(
 
 
 @dataclass
-class ProcessArgs:
+class ProcessOptions:
     command: List[str]
     cwd: Optional[Path] = None
     env: Optional[dict] = None
@@ -53,14 +53,19 @@ class ProcessArgs:
             raise TypeError(f"invalid 'command' type: expected {list}")
         self.command = [str(el) for el in self.command]
 
+    def update(self, value: Optional["ProcessOptions"]) -> None:
+        if not value:
+            return
+        self.command = value.command or self.command
+        self.cwd = value.cwd or self.cwd
+        self.env = value.env or self.env
+
 
 class ChildProcess:
     """Wrapper around subprocess.Popen with safe lifecycle management."""
 
-    def __init__(self, args: ProcessArgs):
-        self.command = args.command
-        self.cwd = args.cwd
-        self.env = args.env
+    def __init__(self, options: ProcessOptions):
+        self.options = options
         self.process: Optional[subprocess.Popen] = None
 
         self._switch_lock = threading.RLock()
@@ -72,26 +77,24 @@ class ChildProcess:
         with self._switch_lock:
             return self._is_running
 
-    def run(self, args: ProcessArgs) -> None:
+    def run(self, options: Optional[ProcessOptions] = None) -> None:
         """Start the child process."""
         with self._switch_lock:
             if self._is_running:
                 LOGGER.warning("Process already running, ignoring run()")
                 return
 
-            _command = args.command or self.command
-            _env = args.env or self.env
-            _cwd = args.cwd or self.cwd
-            LOGGER.info("Executing command: %s", shlex.join(_command))
+            self.options.update(options)
+            LOGGER.info("Executing command: %s", shlex.join(self.options.command))
 
             try:
                 self.process = subprocess.Popen(
-                    _command,
+                    self.options.command,
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    env=_env,
-                    cwd=_cwd,
+                    env=self.options.env,
+                    cwd=self.options.cwd,
                     bufsize=0,
                     startupinfo=STARTUPINFO,
                 )
@@ -107,29 +110,32 @@ class ChildProcess:
     @property
     @recover_exception(BytesIO)
     def stdin(self):
-        return self.process.stdin if self.process else None
+        return self.process.stdin
 
     @property
     @recover_exception(BytesIO)
     def stdout(self):
-        return self.process.stdout if self.process else None
+        return self.process.stdout
 
     @property
     @recover_exception(BytesIO)
     def stderr(self):
-        return self.process.stderr if self.process else None
+        return self.process.stderr
 
     def _listen_stderr_task(self):
         """Continuously read stderr and log output."""
-        self._stderr_closed_event.clear()
-        prefix = f"[{Path(self.command[0]).name}]"
 
-        try:
+        def _listen(prefix: str):
             while True:
                 line = self.stderr.readline()
                 if not line:
                     break
                 print(f'{prefix} {line.rstrip().decode(errors="replace")}')
+
+        self._stderr_closed_event.clear()
+        prefix = f"[{Path(self.options.command[0]).name}]"
+        try:
+            _listen(prefix)
         finally:
             self._stderr_closed_event.set()
 
@@ -160,4 +166,5 @@ class ChildProcess:
 
             # Ensure stderr thread finishes
             self._stderr_closed_event.wait(timeout=2)
+            # Release Popen object
             self.process = None
