@@ -24,17 +24,17 @@ class InitializerMixin(BaseClient):
             return
         self.session.status = SessionStatus.Initializing
 
-        # check if view not closed
-        if view is None:
+        # Check view is exist and has file_name
+        if not (view or view.file_name()):
             return
-
-        self._initialized_event.clear()
 
         workspace_path = get_workspace_path(view)
         if not workspace_path:
             return
-        self.session.workspace_folders = [Workspace(workspace_path)]
 
+        self._initialized_event.clear()
+
+        self.session.workspace_folders = [Workspace(workspace_path)]
         params = {
             "processId": getpid(),
             "clientInfo": {"name": "Sublime Text", "version": sublime.version()},
@@ -64,7 +64,7 @@ class InitializerMixin(BaseClient):
     def wait_initialized(self, timeout: float = 10.0) -> None:
         if not self._initialized_event.wait(timeout):
             self.session.status = SessionStatus.NotSet
-            raise TimeoutError("initialize timed out")
+            raise TimeoutError("Initialize timed out")
 
 
 def get_workspace_path(view: sublime.View, return_parent: bool = True) -> str:
@@ -80,9 +80,6 @@ def get_workspace_path(view: sublime.View, return_parent: bool = True) -> str:
         workspace path or empty string
     """
     file_name = view.file_name()
-    if not file_name:
-        return ""
-
     if folders := [
         folder for folder in view.window().folders() if file_name.startswith(folder)
     ]:
