@@ -44,21 +44,65 @@ def recover_exception(
 
 @dataclass
 class ProcessOptions:
-    command: List[str]
-    cwd: Optional[Path] = None
+    @property
+    def command(self) -> List[str]:
+        raise NotImplementedError("command")
+
+    def update(self, value: "ProcessOptions") -> None:
+        raise NotImplementedError("update")
+
+
+@dataclass
+class Module(ProcessOptions):
+    python: str
+    modname: str
+    argv: List[str] = None
+    cwd: Optional[str] = None
     env: Optional[dict] = None
 
-    def __post_init__(self):
-        if not isinstance(self.command, list):
-            raise TypeError(f"invalid 'command' type: expected {list}")
-        self.command = [str(el) for el in self.command]
+    @property
+    def command(self) -> List[str]:
+        _cmd = [self.python, "-m", self.modname]
+        _argv = self.argv or []
+        return _cmd + _argv
 
-    def update(self, value: Optional["ProcessOptions"]) -> None:
-        if not value:
-            return
-        self.command = value.command or self.command
+    def update(self, value: "Module") -> None:
+        self.python = value.python or self.python
+        self.modname = value.modname or self.modname
+        self.argv = value.argv or self.argv
         self.cwd = value.cwd or self.cwd
         self.env = value.env or self.env
+
+
+@dataclass
+class Executable(ProcessOptions):
+    executable: str
+    argv: List[str] = None
+    cwd: Optional[str] = None
+    env: Optional[dict] = None
+
+    @property
+    def command(self) -> List[str]:
+        _argv = self.argv or []
+        return [self.executable] + _argv
+
+    def update(self, value: "Executable") -> None:
+        self.executable = value.executable or self.executable
+        self.argv = value.argv or self.argv
+        self.cwd = value.cwd or self.cwd
+        self.env = value.env or self.env
+
+
+def load_options(data: dict) -> ProcessOptions:
+    for cls in {Module, Executable}:
+        try:
+            return cls(**data)
+        except Exception:
+            pass
+
+    raise TypeError(
+        f"Error load options. Data must serialized from {Module, Executable}"
+    )
 
 
 class ChildProcess:

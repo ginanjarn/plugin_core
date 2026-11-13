@@ -3,7 +3,7 @@ import threading
 import sublime
 
 from ..base_client import BaseClient
-from ..child_process import ProcessOptions
+from ..child_process import load_options
 
 
 class _StartServerCommandMixin:
@@ -20,7 +20,7 @@ class _StartServerCommandMixin:
 
         with self._run_lock:
             try:
-                self.client.server_process.run(ProcessOptions(**args))
+                self.client.server_process.run(load_options(args))
                 self.client.connect()
 
                 self.client.initialize(self.view)
