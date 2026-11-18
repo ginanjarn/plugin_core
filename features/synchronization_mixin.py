@@ -2,16 +2,16 @@ from typing import List
 
 import sublime
 
-from ..base_client import BaseClient, require_server_capability
 from ..document import Document, TextChange
 from ..lsprotocol.lsprotocol import TextDocumentContentChangePartial
 from ..uri import path_to_uri
+from .base_feature import BaseFeature, require_server_capability
 
 # Threshold in bytes to avoid sending full document text blindly
 FULL_TEXT_SIZE_THRESHOLD = 200_000
 
 
-class DocumentSynchronizerMixin(BaseClient):
+class DocumentSynchronizerMixin(BaseFeature):
     """
     Robust document synchronization mixin.
     Handles didOpen, didSave, didClose and didChange notifications with
@@ -19,6 +19,7 @@ class DocumentSynchronizerMixin(BaseClient):
     """
 
     def set_client_capabilities(self):
+        super().set_client_capabilities()
         self.session.client_capabilities["textDocument"].update(
             {
                 "synchronization": {

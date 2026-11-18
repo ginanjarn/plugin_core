@@ -3,10 +3,10 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import sublime
 
-from ...base_client import BaseClient, require_server_capability
 from ...lsprotocol.client import DocumentSymbol, SymbolInformation
 from ...uri import path_to_uri, uri_to_path
 from ...utils import on_main_thread, on_new_thread
+from ..base_feature import BaseFeature, require_server_capability
 
 PathEncodedStr = str
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
@@ -14,12 +14,13 @@ SymbolLocation = namedtuple("SymbolLocation", ["file_name", "row", "column"])
 Symbol = namedtuple("Symbol", ["name", "kind", "location", "container_name"])
 
 
-class DocumentSymbolMixin(BaseClient):
+class DocumentSymbolMixin(BaseFeature):
     """Request document symbols and present them in a quick panel with previews."""
 
     document_symbol_target: Optional[object]
 
     def set_client_capabilities(self):
+        super().set_client_capabilities()
         self.session.client_capabilities["textDocument"].update(
             {
                 "documentSymbol": {

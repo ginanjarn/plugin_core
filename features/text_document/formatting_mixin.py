@@ -2,20 +2,21 @@ from typing import List, Optional, Union
 
 import sublime
 
-from ...base_client import BaseClient, require_server_capability
 from ...document import Document
 from ...lsprotocol.client import TextEdit
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
+from ..base_feature import BaseFeature, require_server_capability
 from ..workspace_updater import apply_text_edits
 
 
-class DocumentFormattingMixin(BaseClient):
+class DocumentFormattingMixin(BaseFeature):
     """Handles document formatting requests and results."""
 
     document_formatting_target: Optional[Document]
 
     def set_client_capabilities(self):
+        super().set_client_capabilities()
         self.session.client_capabilities["textDocument"].update(
             {"formatting": {"dynamicRegistration": False}}
         )
@@ -41,7 +42,10 @@ class DocumentFormattingMixin(BaseClient):
             return
         try:
             apply_text_edits(
-                self.session, self.document_formatting_target.file_name, result
+                self.session,
+                self.client_options,
+                self.document_formatting_target.file_name,
+                result,
             )
             sublime.status_message("LSP: Document formatted")
         except Exception as e:

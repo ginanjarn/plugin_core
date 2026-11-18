@@ -15,8 +15,8 @@ from ..lsprotocol.lsprotocol import (
     TextEdit,
     WorkspaceEdit,
 )
-from ..registry import COMMAND_NAME
 from ..session import Session
+from ..options import ClientOptions
 from ..uri import uri_to_path
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
@@ -26,8 +26,9 @@ PathStr = str
 class WorkspaceUpdater:
     """Workspace Updater"""
 
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, options: ClientOptions):
         self.session = session
+        self.options = options
 
     def apply(self, edit: WorkspaceEdit):
         if changes := edit.get("changes"):
@@ -73,14 +74,10 @@ class WorkspaceUpdater:
         else:
             TextFile(file_name).apply_text_changes(text_changes)
 
-    @staticmethod
-    def _apply_view_changes(view: sublime.View, text_changes: List[TextChange]):
+    def _apply_view_changes(self, view: sublime.View, text_changes: List[TextChange]):
         view.run_command(
-            COMMAND_NAME,
-            {
-                "action": "apply_text_change",
-                "changes": [asdict(c) for c in text_changes],
-            },
+            "plugin_core_apply_text_changes",
+            {"changes": [asdict(c) for c in text_changes]},
         )
 
     @staticmethod
@@ -120,14 +117,18 @@ class WorkspaceUpdater:
             view.close()
 
 
-def apply_workspace_edit(session: Session, edit: WorkspaceEdit) -> None:
+def apply_workspace_edit(
+    session: Session, options: ClientOptions, edit: WorkspaceEdit
+) -> None:
     """apply workspace_edit"""
-    WorkspaceUpdater(session).apply(edit)
+    WorkspaceUpdater(session, options).apply(edit)
 
 
-def apply_text_edits(session: Session, file_name: str, edits: List[TextEdit]) -> None:
+def apply_text_edits(
+    session: Session, options: ClientOptions, file_name: str, edits: List[TextEdit]
+) -> None:
     """apply text_edits"""
-    WorkspaceUpdater(session).apply_text_edits(file_name, edits)
+    WorkspaceUpdater(session, options).apply_text_edits(file_name, edits)
 
 
 def rpc_to_textchange(change: TextEdit) -> TextChange:
@@ -136,7 +137,7 @@ def rpc_to_textchange(change: TextEdit) -> TextChange:
         LineCharacter(**change["range"]["start"]),
         LineCharacter(**change["range"]["end"]),
         change["newText"],
-        change.get("rangeLength"),
+        None,
     )
 
 

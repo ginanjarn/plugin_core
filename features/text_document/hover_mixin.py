@@ -4,11 +4,11 @@ from typing import List, Optional, Union
 
 import sublime
 
-from ...base_client import BaseClient, require_server_capability
 from ...document import Document
 from ...lsprotocol.client import Hover
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
+from ..base_feature import BaseFeature, require_server_capability
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
@@ -16,13 +16,14 @@ LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 MAX_HOVER_CHARS = 12_000
 
 
-class DocumentHoverMixin(BaseClient):
+class DocumentHoverMixin(BaseFeature):
     """Handle LSP hover requests and show popups with diagnostics + hover content."""
 
     document_hover_target: Optional[Document]
     hover_point: int
 
     def set_client_capabilities(self):
+        super().set_client_capabilities()
         self.session.client_capabilities["textDocument"].update(
             {
                 "hover": {

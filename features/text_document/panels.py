@@ -6,7 +6,6 @@ import sublime
 from sublime import View
 
 from ...document import TextChange
-from ...registry import COMMAND_NAME
 
 
 class OutputPanel:
@@ -31,11 +30,8 @@ class OutputPanel:
 
         change = TextChange(start, end, text, None)
         self.panel.run_command(
-            COMMAND_NAME,
-            {
-                "action": "apply_text_change",
-                "changes": [asdict(change)],
-            },
+            "plugin_core_apply_text_changes",
+            {"changes": [asdict(change)]},
         )
 
     def insert_text(self, text: str) -> None:

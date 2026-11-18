@@ -1,6 +1,9 @@
-from functools import wraps
-import sublime
 import traceback
+from collections import defaultdict
+from functools import wraps
+from time import monotonic as time_monotonic
+
+import sublime
 
 
 def on_main_thread(func):
@@ -35,3 +38,22 @@ def on_new_thread(func):
         return None  # fire-and-forget
 
     return wrapper
+
+
+DEBOUNCE_MAP = defaultdict(lambda: 0)
+
+
+def debounce(duration: float = 0.5):
+    def inner_fn(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            _now = time_monotonic()
+            if _now < DEBOUNCE_MAP[func]:
+                return None
+
+            DEBOUNCE_MAP[func] = _now + duration
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return inner_fn

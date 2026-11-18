@@ -3,22 +3,23 @@ from typing import List, Optional, Union
 
 import sublime
 
-from ...base_client import BaseClient, require_server_capability
 from ...document import Document
 from ...lsprotocol.client import Definition, DefinitionLink, Location
 from ...uri import path_to_uri, uri_to_path
 from ...utils import on_main_thread, on_new_thread
+from ..base_feature import BaseFeature, require_server_capability
 
 PathEncodedStr = str
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
 
-class DocumentDefinitionMixin(BaseClient):
+class DocumentDefinitionMixin(BaseFeature):
     """Handles LSP definition requests and results."""
 
     document_definition_target: Optional[Document]
 
     def set_client_capabilities(self):
+        super().set_client_capabilities()
         self.session.client_capabilities["textDocument"].update(
             {"definition": {"dynamicRegistration": False, "linkSupport": False}}
         )

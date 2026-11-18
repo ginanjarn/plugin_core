@@ -3,23 +3,24 @@ from typing import Any, Dict, Optional, Union
 
 import sublime
 
-from ...base_client import BaseClient, require_server_capability
 from ...document import Document
 from ...lsprotocol.client import PrepareRenameResult
 from ...lsprotocol.client import WorkspaceEdit as LspWorkspaceEdit
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
+from ..base_feature import BaseFeature, require_server_capability
 from ..workspace_updater import apply_workspace_edit
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
 
-class DocumentRenameMixin(BaseClient):
+class DocumentRenameMixin(BaseFeature):
     """Handle LSP prepareRename and rename requests with safer defaults and UX."""
 
     document_rename_target: Optional[Document]
 
     def set_client_capabilities(self):
+        super().set_client_capabilities()
         self.session.client_capabilities["textDocument"].update(
             {
                 "rename": {
@@ -153,7 +154,7 @@ class DocumentRenameMixin(BaseClient):
             return
 
         try:
-            apply_workspace_edit(self.session, result)
+            apply_workspace_edit(self.session, self.client_options, result)
             sublime.status_message("LSP: Rename applied")
         except Exception as e:
             print(f"[LSP Rename] Error applying workspace edit: {e}")

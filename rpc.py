@@ -51,16 +51,6 @@ class MessageExchangeBase:
             LOGGER.error("Failed to receive/parse message: %s", err)
             raise
 
-    def _handle(
-        self, context: Context, method: Method, param_or_result: Optional[Any] = None
-    ) -> Optional[Result]:
-        """_handle command"""
-        raise NotImplementedError("_handle")
-
-    def listen(self) -> None:
-        """listen message"""
-        raise NotImplementedError("listen")
-
 
 class RequestManager:
     """RequestManager manage method mapped to request_id."""

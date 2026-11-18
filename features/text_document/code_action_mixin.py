@@ -2,20 +2,20 @@ from typing import List, Optional, Union
 
 import sublime
 
-from ...base_client import BaseClient, require_server_capability
 from ...document import Document
 from ...lsprotocol.client import CodeAction, Command
-from ...registry import COMMAND_NAME
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
+from ..base_feature import BaseFeature, require_server_capability
 from ..workspace_updater import apply_workspace_edit
 
 
-class DocumentCodeActionMixin(BaseClient):
+class DocumentCodeActionMixin(BaseFeature):
 
     document_code_action_target: Optional[Document]
 
     def set_client_capabilities(self):
+        super().set_client_capabilities()
         self.session.client_capabilities["textDocument"].update(
             {
                 "codeAction": {
@@ -109,14 +109,14 @@ class DocumentCodeActionMixin(BaseClient):
         self, context: dict, action: Union[Command, CodeAction]
     ) -> None:
         if edit := action.get("edit"):
-            apply_workspace_edit(self.session, edit)
+            apply_workspace_edit(self.session, self.client_options, edit)
         elif command := action.get("command"):
             if isinstance(command, str):
                 # action type is Command
                 command = action
             view = self.document_code_action_target.view
             view.run_command(
-                COMMAND_NAME,
+                self.client_options.command_name,
                 {"action": "workspace_execute_command", "command": command},
             )
         else:

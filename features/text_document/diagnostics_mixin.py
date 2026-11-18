@@ -3,11 +3,10 @@ from collections import namedtuple
 import sublime
 from sublime import View
 
-from ...base_client import BaseClient
 from ...lsprotocol.client import PublishDiagnosticsParams
-from ...registry import PACKAGE_NAME, SETTINGS_BASENAME
 from ...uri import uri_to_path
 from ...utils import on_main_thread
+from ..base_feature import BaseFeature
 from .diagnostic_reporter import Diagnostic, ReportManager, Settings
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
@@ -22,10 +21,11 @@ def load_settings(basename: str) -> Settings:
     )
 
 
-class DocumentDiagnosticsMixin(BaseClient):
+class DocumentDiagnosticsMixin(BaseFeature):
     """Handles diagnostics notifications from the language server."""
 
     def set_client_capabilities(self):
+        super().set_client_capabilities()
         self.session.client_capabilities["textDocument"].update(
             {
                 "diagnostic": {
@@ -54,8 +54,8 @@ class DocumentDiagnosticsMixin(BaseClient):
         diagnostics = params.get("diagnostics", [])
 
         if not self.session.diagnostic_reporter:
-            settings = load_settings(SETTINGS_BASENAME)
-            self.session.diagnostic_reporter = ReportManager(PACKAGE_NAME, settings)
+            settings = load_settings(self.client_options.settings_basename)
+            self.session.diagnostic_reporter = ReportManager(self.client_name, settings)
 
         documents = self.session.get_documents(lambda doc: doc.file_name == file_name)
         for document in documents:

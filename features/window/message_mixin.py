@@ -2,9 +2,9 @@ from typing import Any, Dict, List, Optional
 
 import sublime
 
-from ...base_client import BaseClient
 from ...lsprotocol.client import LogMessageParams, ShowMessageParams
 from ...utils import on_main_thread
+from ..base_feature import BaseFeature
 
 # LSP MessageType: 1 = Error, 2 = Warning, 3 = Info, 4 = Log
 _MESSAGE_TYPE_NAME = {
@@ -15,10 +15,11 @@ _MESSAGE_TYPE_NAME = {
 }
 
 
-class WindowMessageMixin(BaseClient):
+class WindowMessageMixin(BaseFeature):
     """Handle LSP window messages and show them in Sublime with sensible UI mapping."""
 
     def set_client_capabilities(self):
+        super().set_client_capabilities()
         self.session.client_capabilities["window"].update(
             {
                 "showMessage": {

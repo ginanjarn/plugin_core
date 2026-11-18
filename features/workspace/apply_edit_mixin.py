@@ -1,15 +1,15 @@
 import logging
 from typing import Any, Dict
 
-from ...base_client import BaseClient
 from ...lsprotocol.client import ApplyWorkspaceEditParams, ApplyWorkspaceEditResult
 from ...utils import on_main_thread
+from ..base_feature import BaseFeature
 from ..workspace_updater import apply_workspace_edit
 
 LOGGER = logging.getLogger(__name__)
 
 
-class WorkspaceApplyEditMixin(BaseClient):
+class WorkspaceApplyEditMixin(BaseFeature):
     """
     Handle workspace/applyEdit requests from the server.
 
@@ -20,6 +20,7 @@ class WorkspaceApplyEditMixin(BaseClient):
     """
 
     def set_client_capabilities(self):
+        super().set_client_capabilities()
         self.session.client_capabilities["workspace"].update(
             {
                 "applyEdit": True,
@@ -51,7 +52,7 @@ class WorkspaceApplyEditMixin(BaseClient):
 
         try:
             # apply_workspace_edit is expected to raise on failure
-            apply_workspace_edit(self.session, edit)
+            apply_workspace_edit(self.session, self.client_options, edit)
         except Exception as err:
             # Log full traceback for diagnostics
             LOGGER.error("applyWorkspaceEdit failed: %s", err, exc_info=True)

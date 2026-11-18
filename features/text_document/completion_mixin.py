@@ -5,11 +5,11 @@ from typing import List, Optional, Union
 import sublime
 from sublime import KindId
 
-from ...base_client import BaseClient, require_server_capability
 from ...document import Document
 from ...lsprotocol.client import CompletionItem, CompletionList
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
+from ..base_feature import BaseFeature, require_server_capability
 
 
 class _Empty:
@@ -74,7 +74,7 @@ class CompletionBuffer:
             return completions
 
 
-class DocumentCompletionMixin(BaseClient):
+class DocumentCompletionMixin(BaseFeature):
     """Handles completion requests and caching."""
 
     _auto_complete_args = {
@@ -87,6 +87,7 @@ class DocumentCompletionMixin(BaseClient):
     _completion_buffer: CompletionBuffer
 
     def set_client_capabilities(self):
+        super().set_client_capabilities()
         self.session.client_capabilities["textDocument"].update(
             {
                 "completion": {

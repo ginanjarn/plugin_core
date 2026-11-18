@@ -1,30 +1,28 @@
-import time
 from collections import namedtuple
 from typing import Any, Dict, List, Optional, Union
 
 import sublime
 
-from ...base_client import BaseClient, require_server_capability
 from ...document import Document
 from ...lsprotocol.client import SignatureHelp
 from ...uri import path_to_uri
 from ...utils import on_main_thread, on_new_thread
+from ..base_feature import BaseFeature, require_server_capability
 
 LineCharacter = namedtuple("LineCharacter", ["line", "character"])
 
-# Debounce interval in seconds to avoid spamming the server on fast typing
-SIGNATURE_HELP_DEBOUNCE = 0.5
+
 # Maximum characters shown in a signature popup to avoid huge UI blocks
 MAX_SIGNATURE_CHARS = 6_000
 
 
-class DocumentSignatureHelpMixin(BaseClient):
+class DocumentSignatureHelpMixin(BaseFeature):
     """Handle LSP signatureHelp requests and show a transient popup with signature info."""
 
     document_signature_help_target: Optional[Document]
-    _last_signature_help_request_time: float
 
     def set_client_capabilities(self):
+        super().set_client_capabilities()
         self.session.client_capabilities["textDocument"].update(
             {
                 "signatureHelp": {
@@ -48,13 +46,6 @@ class DocumentSignatureHelpMixin(BaseClient):
         document = self.session.get_document(view)
         if not document:
             return
-
-        # Debounce: ignore requests that come too quickly
-        now = time.monotonic()
-        last_request_time = getattr(self, "_last_signature_help_request_time", 0)
-        if now - last_request_time < SIGNATURE_HELP_DEBOUNCE:
-            return
-        self._last_signature_help_request_time = now
 
         # hide any previous popup
         if prev_target := getattr(self, "document_signature_help_target", None):

@@ -6,13 +6,13 @@ from uuid import uuid4
 
 import sublime
 
-from ..base_client import BaseClient
 from ..lsprotocol.client import InitializeResult
 from ..session import SessionStatus, Workspace
 from ..uri import path_to_uri
+from .base_feature import BaseFeature
 
 
-class InitializerMixin(BaseClient):
+class InitializerMixin(BaseFeature):
 
     _initialized_event = threading.Event()
 
